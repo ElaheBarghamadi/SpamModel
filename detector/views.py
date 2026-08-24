@@ -64,7 +64,6 @@ def train_model(request):
         df = pd.read_csv(dataset_path)
         df = df.dropna(subset=["text", "label"]).reset_index(drop=True)
 
-        # تبدیل label
         label_map = {"ham": 0, "spam": 1, "0": 0, "1": 1, 0: 0, 1: 1}
         df["label"] = df["label"].map(label_map)
         df = df.dropna(subset=["label"]).reset_index(drop=True)
@@ -81,14 +80,12 @@ def train_model(request):
         X_test = core.as_model_input(test_df["text"])
         y_test = test_df["label"].values
 
-        # آموزش
         t0 = time.time()
         clf = core.get_classifier()
         pipe = core.build_pipeline(clf)
         pipe.fit(X_train, y_train)
         train_time = time.time() - t0
 
-        # ارزیابی
         proba_test = pipe.predict_proba(X_test)[:, 1]
         pred_test = (proba_test >= 0.5).astype(int)
 
@@ -101,12 +98,10 @@ def train_model(request):
 
         report = classification_report(y_test, pred_test, target_names=["ham", "spam"], output_dict=True)
 
-        # ذخیره مدل
         os.makedirs(os.path.join(settings.BASE_DIR, 'saved_models'), exist_ok=True)
         save_path = os.path.join(settings.BASE_DIR, 'saved_models', core.MODEL_FILENAME)
         joblib.dump({"pipeline": pipe, "threshold": 0.5}, save_path)
 
-        # ذخیره متادیتا
         metadata = {
             "display_name": core.MODEL_NAME,
             "n_samples_total": len(df),
@@ -124,7 +119,6 @@ def train_model(request):
         with open(metadata_path, "w", encoding="utf-8") as f:
             json.dump(metadata, f, ensure_ascii=False, indent=2)
 
-        # تبدیل کلید f1-score
         for key in report:
             if isinstance(report[key], dict) and 'f1-score' in report[key]:
                 report[key]['f1_score'] = report[key].pop('f1-score')
@@ -153,38 +147,90 @@ def test_text(request):
 
 
 def test_file(request):
-    """تست با فایل"""
+    """تست با فایل - با پشتیبانی از برچسب و نمایش نمرات"""
     results = None
     summary = None
+    metrics = None
+    has_labels = False
 
     if request.method == 'POST' and request.FILES.get('file'):
         file = request.FILES['file']
 
         try:
+            # خواندن فایل
             if file.name.endswith('.csv'):
                 df = pd.read_csv(file)
-                if 'text' in df.columns:
-                    texts = df['text'].tolist()
-                elif len(df.columns) >= 1:
-                    texts = df.iloc[:, 0].tolist()
-                else:
-                    return render(request, 'test_file.html', {'error': 'ستون text یافت نشد'})
+            elif file.name.endswith('.xlsx') or file.name.endswith('.xls'):
+                df = pd.read_excel(file)
             else:
                 content = file.read().decode('utf-8')
-                texts = [line.strip() for line in content.split('\n') if line.strip()]
+                lines = [l.strip() for l in content.split('\n') if l.strip()]
+                df = pd.DataFrame({'text': lines})
 
+            # تشخیص ستون متن
+            text_col = None
+            for col in ['text', 'message', 'content', 'comment', 'متن', 'پیام']:
+                if col in df.columns:
+                    text_col = col
+                    break
+            if text_col is None:
+                text_col = df.columns[0]
+
+            # تشخیص ستون برچسب
+            label_col = None
+            for col in ['label', 'labels', 'class', 'target', 'برچسب', 'دسته']:
+                if col in df.columns:
+                    label_col = col
+                    break
+
+            # تبدیل برچسب‌ها
+            label_map = {
+                "ham": 0, "normal": 0, "not spam": 0, "0": 0, 0: 0,
+                "spam": 1, "1": 1, 1: 1, "اسپم": 1, "عادی": 0,
+            }
+
+            if label_col:
+                has_labels = True
+                df['true_label_raw'] = df[label_col].copy()
+                df['true_label'] = df[label_col].map(label_map)
+                # ردیف‌های بدون برچسب معتبر رو حذف کن
+                df = df.dropna(subset=['text', 'true_label'])
+                df['true_label'] = df['true_label'].astype(int)
+            else:
+                df = df.dropna(subset=[text_col])
+
+            # محدود کردن به 2000 ردیف
+            df = df.head(2000).reset_index(drop=True)
+
+            # پیش‌بینی
             results = []
-            spam_count = 0
-            ham_count = 0
+            y_true = []
+            y_pred = []
+            y_proba = []
 
-            for text in texts[:1000]:
-                if text and str(text) != 'nan':
-                    pred = predict_text(str(text))
-                    results.append(pred)
-                    if pred['label'] == 'spam':
-                        spam_count += 1
-                    else:
-                        ham_count += 1
+            for idx, row in df.iterrows():
+                text = str(row[text_col])
+                if not text or text == 'nan':
+                    continue
+
+                pred = predict_text(text)
+                pred['index'] = idx + 1
+                pred['original_text'] = text[:200]
+                results.append(pred)
+
+                if has_labels:
+                    true_val = int(row['true_label'])
+                    pred_val = 1 if pred['label'] == 'spam' else 0
+                    y_true.append(true_val)
+                    y_pred.append(pred_val)
+                    y_proba.append(pred.get('probability', 50) / 100)
+                    pred['true_label'] = true_val
+                    pred['true_label_fa'] = 'اسپم' if true_val == 1 else 'عادی'
+                    pred['correct'] = true_val == pred_val
+
+            # خلاصه
+            spam_count = sum(1 for r in results if r['label'] == 'spam')
+            ham_count = len(results) - spam_count
 
             summary = {
                 'total': len(results),
@@ -192,11 +238,55 @@ def test_file(request):
                 'ham': ham_count,
                 'spam_percent': round(spam_count / len(results) * 100, 1) if results else 0,
                 'ham_percent': round(ham_count / len(results) * 100, 1) if results else 0,
+                'has_labels': has_labels,
             }
+
+            # محاسبه نمرات اگر برچسب داشت
+            if has_labels and len(y_true) > 0:
+                from sklearn.metrics import (
+                    accuracy_score, precision_score, recall_score,
+                    f1_score, roc_auc_score, confusion_matrix, classification_report
+                )
+
+                acc = accuracy_score(y_true, y_pred)
+                prec = precision_score(y_true, y_pred, zero_division=0)
+                rec = recall_score(y_true, y_pred, zero_division=0)
+                f1 = f1_score(y_true, y_pred, zero_division=0)
+
+                try:
+                    roc_auc = roc_auc_score(y_true, y_proba)
+                except:
+                    roc_auc = 0
+
+                cm = confusion_matrix(y_true, y_pred).tolist()
+                report = classification_report(y_true, y_pred, target_names=["ham", "spam"], output_dict=True, zero_division=0)
+
+                for key in report:
+                    if isinstance(report[key], dict) and 'f1-score' in report[key]:
+                        report[key]['f1_score'] = report[key].pop('f1-score')
+
+                metrics = {
+                    'accuracy': round(acc * 100, 2),
+                    'precision': round(prec * 100, 2),
+                    'recall': round(rec * 100, 2),
+                    'f1': round(f1 * 100, 2),
+                    'roc_auc': round(roc_auc * 100, 2),
+                    'confusion_matrix': cm,
+                    'report': report,
+                    'correct': sum(1 for c in y_true if c == y_pred[y_true.index(c)]),
+                    'wrong': sum(1 for c in y_true if c != y_pred[y_true.index(c)]),
+                }
+
         except Exception as e:
             return render(request, 'test_file.html', {'error': str(e)})
 
-    return render(request, 'test_file.html', {'results': results, 'summary': summary})
+    context = {
+        'results': results,
+        'summary': summary,
+        'metrics': metrics,
+        'has_labels': has_labels,
+    }
+    return render(request, 'test_file.html', context)
 
 
 @csrf_exempt
@@ -229,7 +319,7 @@ def predict_text(text):
     X = core.as_model_input([text])
     proba = pipe.predict_proba(X)[:, 1][0]
     label = "spam" if proba >= threshold else "ham"
-    confidence = round(abs(proba - 0.5) * 200, 1)  # تبدیل به درصد اطمینان
+    confidence = round(abs(proba - 0.5) * 200, 1)
     confidence = min(99, max(50, confidence))
 
     return {
