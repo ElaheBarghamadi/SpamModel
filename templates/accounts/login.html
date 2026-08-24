@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}ورود به پیام‌رسان{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="card">
+            <div class="card-body" style="padding: 40px;">
+                <div class="auth-header">
+                    <svg width="60" height="60" viewBox="0 0 24 24" fill="var(--primary-light)" style="margin-bottom: 15px;">
+                        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+                    </svg>
+                    <h1>ورود</h1>
+                    <p>به پیام‌رسان خوش آمدید</p>
+                </div>
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.username.id_for_label }}">نام کاربری</label>
+                        {{ form.username }}
+                        {% if form.username.errors %}
+                        <div class="form-error">{{ form.username.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.password.id_for_label }}">رمز عبور</label>
+                        {{ form.password }}
+                        {% if form.password.errors %}
+                        <div class="form-error">{{ form.password.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-error" style="margin-bottom: 20px; position: static;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                        </svg>
+                        {{ form.non_field_errors.0 }}
+                    </div>
+                    {% endif %}
+
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M11 7L9.6 8.4l2.6 2.6H2v2h10.2l-2.6 2.6L11 17l5-5zM20 19h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-8v2h8v14z"/>
+                        </svg>
+                        ورود
+                    </button>
+                </form>
+
+                <div class="auth-divider">یا</div>
+
+                <div class="auth-footer">
+                    <p>حساب کاربری ندارید؟ <a href="{% url 'accounts:register' %}">ثبت‌نام کنید</a></p>
+                    <p style="margin-top: 10px;">
+                        <a href="{% url 'accounts:password_reset' %}">رمز عبور خود را فراموش کرده‌اید؟</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

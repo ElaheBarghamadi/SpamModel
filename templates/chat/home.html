@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block title %}پیام‌رسان - خانه{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-header">
+        <h2>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="var(--primary-light)" style="vertical-align: middle; margin-left: 8px;">
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+            </svg>
+            گفتگوها
+        </h2>
+        <a href="{% url 'chat:user_list' %}" class="btn btn-primary btn-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+            </svg>
+            گفتگوی جدید
+        </a>
+    </div>
+
+    {% if rooms_data %}
+    <div class="chat-list">
+        {% for data in rooms_data %}
+        <a href="{% url 'chat:room' room_id=data.room.id %}" class="chat-item">
+            <div class="chat-avatar">
+                {% if data.other_user.profile.avatar %}
+                    <img src="{{ data.other_user.profile.avatar.url }}" alt="{{ data.other_user.username }}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+                {% else %}
+                    {{ data.other_user.username|first|upper }}
+                {% endif %}
+                {% if data.other_user.profile.online %}
+                    <div class="online-indicator"></div>
+                {% endif %}
+            </div>
+            <div class="chat-info">
+                <div class="chat-name">
+                    {{ data.other_user.profile.display_name }}
+                    {% if data.other_user.profile.online %}
+                        <span style="color: var(--success); font-size: 0.8rem;">آنلاین</span>
+                    {% endif %}
+                </div>
+                <div class="chat-preview">
+                    {% if data.last_message %}
+                        {% if data.last_message.sender == user %}
+                            <span style="color: var(--text-secondary);">شما:</span>
+                        {% endif %}
+                        {{ data.last_message.content|truncatechars:40 }}
+                    {% else %}
+                        <span style="color: var(--text-secondary);">هنوز پیامی ارسال نشده</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="chat-meta">
+                {% if data.last_message %}
+                    <div class="chat-time">{{ data.last_message.timestamp|time:"H:i" }}</div>
+                {% endif %}
+                {% if data.unread_count > 0 %}
+                    <div class="unread-badge">{{ data.unread_count }}</div>
+                {% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="var(--text-secondary)">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+        </svg>
+        <h3>هنوز گفتگویی ندارید</h3>
+        <p>برای شروع گفتگو، یک کاربر انتخاب کنید</p>
+        <a href="{% url 'chat:user_list' %}" class="btn btn-primary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+            </svg>
+            مشاهده کاربران
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

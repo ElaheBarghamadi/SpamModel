@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+
+{% block title %}ثبت‌نام در پیام‌رسان{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="card">
+            <div class="card-body" style="padding: 40px;">
+                <div class="auth-header">
+                    <svg width="60" height="60" viewBox="0 0 24 24" fill="var(--primary-light)" style="margin-bottom: 15px;">
+                        <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                    <h1>ثبت‌نام</h1>
+                    <p>حساب کاربری جدید ایجاد کنید</p>
+                </div>
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.username.id_for_label }}">نام کاربری</label>
+                        {{ form.username }}
+                        {% if form.username.help_text %}
+                        <div class="form-help">{{ form.username.help_text }}</div>
+                        {% endif %}
+                        {% if form.username.errors %}
+                        <div class="form-error">{{ form.username.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.email.id_for_label }}">ایمیل</label>
+                        {{ form.email }}
+                        {% if form.email.errors %}
+                        <div class="form-error">{{ form.email.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.first_name.id_for_label }}">نام</label>
+                            {{ form.first_name }}
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="{{ form.last_name.id_for_label }}">نام خانوادگی</label>
+                            {{ form.last_name }}
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.password1.id_for_label }}">رمز عبور</label>
+                        {{ form.password1 }}
+                        {% if form.password1.help_text %}
+                        <div class="form-help">{{ form.password1.help_text }}</div>
+                        {% endif %}
+                        {% if form.password1.errors %}
+                        <div class="form-error">{{ form.password1.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.password2.id_for_label }}">تکرار رمز عبور</label>
+                        {{ form.password2 }}
+                        {% if form.password2.help_text %}
+                        <div class="form-help">{{ form.password2.help_text }}</div>
+                        {% endif %}
+                        {% if form.password2.errors %}
+                        <div class="form-error">{{ form.password2.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                        ثبت‌نام
+                    </button>
+                </form>
+
+                <div class="auth-footer">
+                    <p>قبلاً ثبت‌نام کرده‌اید؟ <a href="{% url 'accounts:login' %}">وارد شوید</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
