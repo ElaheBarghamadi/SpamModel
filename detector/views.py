@@ -108,6 +108,11 @@ def train_model(request):
         report = classification_report(y_test, y_pred, target_names=['ham', 'spam'], output_dict=True)
         cm = confusion_matrix(y_test, y_pred)
         
+        # تبدیل کلید f1-score به f1_score
+        for key in report:
+            if isinstance(report[key], dict) and 'f1-score' in report[key]:
+                report[key]['f1_score'] = report[key].pop('f1-score')
+        
         # ذخیره مدل
         os.makedirs(settings.BASE_DIR / 'models', exist_ok=True)
         joblib.dump(model, settings.MODEL_PATH)
