@@ -6,16 +6,20 @@
 <div class="chat-container">
     <div class="chat-header">
         <h2>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="var(--primary-light)" style="vertical-align: middle; margin-left: 8px;">
-                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
             کاربران
         </h2>
     </div>
 
     <div class="search-box">
-        <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+        <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <input 
             type="text" 
@@ -33,7 +37,7 @@
         <a href="{% url 'chat:start_chat' username=u.username %}" class="user-item">
             <div class="user-avatar">
                 {% if u.profile.avatar %}
-                    <img src="{{ u.profile.avatar.url }}" alt="{{ u.username }}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+                    <img src="{{ u.profile.avatar.url }}" alt="" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
                 {% else %}
                     {{ u.username|first|upper }}
                 {% endif %}
@@ -42,38 +46,38 @@
                 <div class="user-name">
                     {{ u.profile.display_name }}
                     {% if u.profile.online %}
-                        <span style="color: var(--success); font-size: 0.8rem; margin-right: 8px;">● آنلاین</span>
+                        <span style="color: var(--success); font-size: 0.75rem; font-weight: 500;">● آنلاین</span>
                     {% endif %}
                 </div>
                 <div class="user-username">@{{ u.username }}</div>
             </div>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--text-secondary)">
-                <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"/>
             </svg>
         </a>
         {% endfor %}
     </div>
     {% else %}
     <div class="empty-state">
-        <svg viewBox="0 0 24 24" fill="var(--text-secondary)">
-            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-        </svg>
+        <div class="empty-state-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--primary-light)" stroke-width="1.5">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+            </svg>
+        </div>
         <h3>کاربری یافت نشد</h3>
-        <p>{% if search_query %}نتیجه‌ای برای "{{ search_query }}" یافت نشد{% else %}هنوز کاربر دیگری ثبت‌نام نکرده است{% endif %}</p>
+        <p>{% if search_query %}نتیجه‌ای برای "{{ search_query }}" یافت نشد{% else %}هنوز کاربر دیگری ثبت‌نام نکرده{% endif %}</p>
     </div>
     {% endif %}
 </div>
 
 <script>
-    // جستجوی زنده
     const searchInput = document.getElementById('search-input');
-    let searchTimeout;
-    
+    let timeout;
     searchInput.addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            const query = this.value.trim();
-            window.location.href = `{% url 'chat:user_list' %}?q=${encodeURIComponent(query)}`;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+            location.href = `{% url 'chat:user_list' %}?q=${encodeURIComponent(this.value.trim())}`;
         }, 500);
     });
 </script>

@@ -8,11 +8,16 @@
         <div class="card">
             <div class="card-body" style="padding: 40px;">
                 <div class="auth-header">
-                    <svg width="60" height="60" viewBox="0 0 24 24" fill="var(--primary-light)" style="margin-bottom: 15px;">
-                        <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    </svg>
-                    <h1>ثبت‌نام</h1>
-                    <p>حساب کاربری جدید ایجاد کنید</p>
+                    <div class="auth-logo">
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                            <circle cx="8.5" cy="7" r="4"/>
+                            <line x1="20" y1="8" x2="20" y2="14"/>
+                            <line x1="23" y1="11" x2="17" y2="11"/>
+                        </svg>
+                    </div>
+                    <h1>حساب جدید بسازید</h1>
+                    <p>به جمع ما بپیوندید!</p>
                 </div>
 
                 <form method="post" novalidate>
@@ -22,10 +27,10 @@
                         <label class="form-label" for="{{ form.username.id_for_label }}">نام کاربری</label>
                         {{ form.username }}
                         {% if form.username.help_text %}
-                        <div class="form-help">{{ form.username.help_text }}</div>
+                        <div class="form-help">💡 {{ form.username.help_text }}</div>
                         {% endif %}
                         {% if form.username.errors %}
-                        <div class="form-error">{{ form.username.errors.0 }}</div>
+                        <div class="form-error">⚠️ {{ form.username.errors.0 }}</div>
                         {% endif %}
                     </div>
 
@@ -33,7 +38,7 @@
                         <label class="form-label" for="{{ form.email.id_for_label }}">ایمیل</label>
                         {{ form.email }}
                         {% if form.email.errors %}
-                        <div class="form-error">{{ form.email.errors.0 }}</div>
+                        <div class="form-error">⚠️ {{ form.email.errors.0 }}</div>
                         {% endif %}
                     </div>
 
@@ -52,10 +57,10 @@
                         <label class="form-label" for="{{ form.password1.id_for_label }}">رمز عبور</label>
                         {{ form.password1 }}
                         {% if form.password1.help_text %}
-                        <div class="form-help">{{ form.password1.help_text }}</div>
+                        <div class="form-help">💡 {{ form.password1.help_text }}</div>
                         {% endif %}
                         {% if form.password1.errors %}
-                        <div class="form-error">{{ form.password1.errors.0 }}</div>
+                        <div class="form-error">⚠️ {{ form.password1.errors.0 }}</div>
                         {% endif %}
                     </div>
 
@@ -63,16 +68,19 @@
                         <label class="form-label" for="{{ form.password2.id_for_label }}">تکرار رمز عبور</label>
                         {{ form.password2 }}
                         {% if form.password2.help_text %}
-                        <div class="form-help">{{ form.password2.help_text }}</div>
+                        <div class="form-help">💡 {{ form.password2.help_text }}</div>
                         {% endif %}
                         {% if form.password2.errors %}
-                        <div class="form-error">{{ form.password2.errors.0 }}</div>
+                        <div class="form-error">⚠️ {{ form.password2.errors.0 }}</div>
                         {% endif %}
                     </div>
 
-                    <button type="submit" class="btn btn-primary btn-block">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top: 8px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                            <circle cx="8.5" cy="7" r="4"/>
+                            <line x1="20" y1="8" x2="20" y2="14"/>
+                            <line x1="23" y1="11" x2="17" y2="11"/>
                         </svg>
                         ثبت‌نام
                     </button>

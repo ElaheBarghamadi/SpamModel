@@ -6,15 +6,15 @@
 <div class="profile-container">
     <div class="card">
         <div class="card-body" style="padding: 40px;">
-            <div class="profile-header">
+            <div style="text-align: center; margin-bottom: 30px;">
                 <div class="profile-avatar-large">
                     {% if user.profile.avatar %}
-                        <img src="{{ user.profile.avatar.url }}" alt="{{ user.username }}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+                        <img src="{{ user.profile.avatar.url }}" alt="" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
                     {% else %}
                         {{ user.username|first|upper }}
                     {% endif %}
                 </div>
-                <h2>{{ user.profile.display_name }}</h2>
+                <h2 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 4px;">{{ user.profile.display_name }}</h2>
                 <p style="color: var(--text-secondary);">@{{ user.username }}</p>
             </div>
 
@@ -23,36 +23,38 @@
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <div class="form-group">
-                        <label class="form-label" for="{{ form.first_name.id_for_label }}">نام</label>
+                        <label class="form-label">نام</label>
                         {{ form.first_name }}
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="{{ form.last_name.id_for_label }}">نام خانوادگی</label>
+                        <label class="form-label">نام خانوادگی</label>
                         {{ form.last_name }}
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="{{ form.email.id_for_label }}">ایمیل</label>
+                    <label class="form-label">ایمیل</label>
                     {{ form.email }}
                     {% if form.email.errors %}
-                    <div class="form-error">{{ form.email.errors.0 }}</div>
+                    <div class="form-error">⚠️ {{ form.email.errors.0 }}</div>
                     {% endif %}
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="{{ form.bio.id_for_label }}">بیوگرافی</label>
+                    <label class="form-label">بیوگرافی</label>
                     {{ form.bio }}
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="{{ form.avatar.id_for_label }}">تصویر پروفایل</label>
+                    <label class="form-label">تصویر پروفایل</label>
                     {{ form.avatar }}
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-block">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                <button type="submit" class="btn btn-primary btn-block btn-lg">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
                     </svg>
                     ذخیره تغییرات
                 </button>
