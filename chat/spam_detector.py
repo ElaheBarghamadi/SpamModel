@@ -1,20 +1,26 @@
 """
-سرویس تشخیص اسپم و محتوای نامناسب
-بر اساس مدل PHICAD - Persian Harmful Comment Classifier
+سرویس تشخیص اسپم و محتوای نامناسب فارسی
+نسخه ۲.۰ - بهبود یافته با نرمال‌سازی قوی‌تر و احتمالات دقیق‌تر
 """
 
 import re
 import os
 import logging
+import math
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# الگوهای پیش‌پردازش متن فارسی
+# نرمال‌سازی پیشرفته متن فارسی
 # ---------------------------------------------------------------------------
 
-URL_PATTERN = re.compile(r"(https?://\S+|www\.\S+)")
-USERNAME_PATTERN = re.compile(r"@\w+")
+# حذف URL
+URL_PATTERN = re.compile(r"(https?://\S+|www\.\S+|t\.me/\S+|instagram\.com/\S+|wa\.me/\S+)", re.IGNORECASE)
+
+# حذف منشن
+USERNAME_PATTERN = re.compile(r"@[\w.]+")
+
+# حذف ایموجی
 EMOJI_PATTERN = re.compile(
     "["
     "\U0001F300-\U0001FAFF"
@@ -27,87 +33,166 @@ EMOJI_PATTERN = re.compile(
     "]+",
     flags=re.UNICODE,
 )
-EXTRA_SPACE_PATTERN = re.compile(r"\s+")
 
+# نگاشت کاراکترهای عربی به فارسی
 PERSIAN_CHAR_MAP = {
     "ي": "ی", "ى": "ی", "ك": "ک", "ة": "ه", "ۀ": "ه",
     "ؤ": "و", "إ": "ا", "أ": "ا", "ٱ": "ا", "ٲ": "ا",
-    "ﻻ": "لا", "ﷲ": "الله",
-    "‌": " ", "‏": "", "‎": "",
+    "ﻵ": "لا", "ﻷ": "لا", "ﻹ": "لا", "ﻻ": "لا",
+    "ﷲ": "الله", "ﷺ": "صلی الله علیه وسلم",
+    "‌": " ",  # ZWNJ -> space
+    "‏": "",   # RTL mark
+    "‎": "",   # LTR mark
+    "\u200c": " ",  # zero-width non-joiner
+    "\u200d": "",   # zero-width joiner
+    "\u200e": "",   # LTR mark
+    "\u200f": "",   # RTL mark
+    "\u00ad": "",   # soft hyphen
+    "\u200b": "",   # zero-width space
 }
 
+# نگاشت اعداد فارسی و عربی
 PERSIAN_DIGIT_MAP = str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")
 ARABIC_DIGIT_MAP = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+EXTENDED_DIGIT_MAP = str.maketrans("۰۱۲۳۴۵۶۷۸٩٨٧٦٥٤٣٢١٠", "0123456789876543210")
 
-DIACRITICS_PATTERN = re.compile(r"[\u064B-\u065F\u0670\u06D6-\u06ED]")
-LETTER_ELONGATION_PATTERN = re.compile(r"([\u0600-\u06FF])\1{2,}")
+# حذف اعراب
+DIACRITICS_PATTERN = re.compile(r"[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]")
 
-_PERSIAN_LETTER = r"[\u0600-\u06FF]"
-SEPARATOR_OBFUSCATION_PATTERN = re.compile(
-    rf"(?<!{_PERSIAN_LETTER})(?:{_PERSIAN_LETTER}[.*_\-]+){{1,}}{_PERSIAN_LETTER}(?!{_PERSIAN_LETTER})"
-)
-SPACED_OBFUSCATION_PATTERN = re.compile(
-    rf"(?<!{_PERSIAN_LETTER})(?:{_PERSIAN_LETTER}\s+){{2,}}{_PERSIAN_LETTER}(?!{_PERSIAN_LETTER})"
-)
-FULLY_CENSORED_TOKEN_PATTERN = re.compile(r"(?<!\S)[*#@$%_\-]{2,}(?!\S)")
-CENSORED_TOKEN_PLACEHOLDER = "سانسور"
+# حذف کاراکترهای تکراری (۳ بار یا بیشتر)
+REPEATED_CHAR_PATTERN = re.compile(r"(.)\1{2,}")
 
-ALLOWED_CHARS_PATTERN = re.compile(
-    r"[^\u0600-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF0-9a-zA-Z\s.!؟?]"
-)
+# الگوی شماره تلفن ایرانی
+PHONE_PATTERN = re.compile(r"09[0-9]{9}|(\+98|0098)9[0-9]{9}")
+
+# الگوی شماره کارت بانکی
+CARD_PATTERN = re.compile(r"\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}")
+
+# کاراکترهای مجاز
+ALLOWED_CHARS_PATTERN = re.compile(r"[^\u0600-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF0-9a-zA-Z\s.!؟?،,;؛]")
+
+# فضای اضافی
+EXTRA_SPACE_PATTERN = re.compile(r"\s+")
 
 
-def clean_text(text: str) -> str:
-    """پیش‌پردازش کامل متن فارسی"""
+def normalize_persian(text: str) -> str:
+    """نرمال‌سازی کامل متن فارسی"""
     if not isinstance(text, str):
         return ""
 
-    text = URL_PATTERN.sub(" ", text)
+    # حذف URL
+    text = URL_PATTERN.sub(" لینک ", text)
+
+    # حذف منشن
     text = USERNAME_PATTERN.sub(" ", text)
+
+    # حذف ایموجی
     text = EMOJI_PATTERN.sub(" ", text)
 
-    for arabic_char, persian_char in PERSIAN_CHAR_MAP.items():
-        text = text.replace(arabic_char, persian_char)
+    # نرمال‌سازی کاراکترها
+    for old, new in PERSIAN_CHAR_MAP.items():
+        text = text.replace(old, new)
 
+    # نرمال‌سازی اعداد
     text = text.translate(PERSIAN_DIGIT_MAP)
     text = text.translate(ARABIC_DIGIT_MAP)
+
+    # حذف اعراب
     text = DIACRITICS_PATTERN.sub("", text)
-    text = LETTER_ELONGATION_PATTERN.sub(r"\1", text)
 
-    def _strip_separators(match):
-        return re.sub(r"[\s.*_\-]+", "", match.group(0))
+    # کاهش تکرار کاراکترها
+    text = REPEATED_CHAR_PATTERN.sub(r"\1\1", text)
 
-    text = SEPARATOR_OBFUSCATION_PATTERN.sub(_strip_separators, text)
-    text = SPACED_OBFUSCATION_PATTERN.sub(_strip_separators, text)
-    text = FULLY_CENSORED_TOKEN_PATTERN.sub(CENSORED_TOKEN_PLACEHOLDER, text)
+    # حذف کاراکترهای اضافی
     text = ALLOWED_CHARS_PATTERN.sub(" ", text)
+
+    # حذف فضای اضافی
     text = EXTRA_SPACE_PATTERN.sub(" ", text).strip()
 
-    return text
+    return text.lower()
 
 
 # ---------------------------------------------------------------------------
-# کلمات کلیدی اسپم و نفرت‌انگیز فارسی
+# الگوهای تشخیص اسپم (با امتیازدهی)
 # ---------------------------------------------------------------------------
 
-SPAM_KEYWORDS = [
-    'کانال تلگرام', 'لینک بیو', 'فالو کنید', 'فالو بک', 'سابسکرایب',
-    'لایک کنید', 'کد تخفیف', 'خرید کنید', 'فروش ویژه', 'تخفیف ویژه',
-    'درآمد میلیونی', 'کسب درآمد', 'پولدار شوید', 'بدون سرمایه',
-    'ارسال رایگان', 'گارانتی', 'ضمانت', 'محدود', 'فوری',
-    'واتساپ', 'تلگرام', 'اینستاگرام', 'کلیک کنید', 'ثبت نام کنید',
-    'جایزه ببرید', 'برنده شدید', 'هدیه رایگان', 'شانس شما',
-    '091', '093', '090', '092', '099',
-    'تومان', 'ریال', 'قیمت', 'ارزان', 'گران',
+SPAM_PATTERNS = [
+    # تبلیغات و بازاریابی
+    (r"کانال\s*(تلگرام|واتساپ|اینستاگرام)", 0.95, "تبلیغ کانال"),
+    (r"لینک\s*(بیو|bio|پایین|زیر)", 0.95, "لینک بیو"),
+    (r"(فالو|follow)\s*(کن|بکن|بزن)", 0.85, "درخواست فالو"),
+    (r"(لایک|like)\s*(کن|بکن|بزن)", 0.80, "درخواست لایک"),
+    (r"(سابسکرایب|subscribe)\s*(کن|بکن)", 0.90, "درخواست سابسکرایب"),
+    (r"(کد\s*تخفیف|تخفیف\s*ویژه|فروش\s*ویژه)", 0.90, "تبلیغ تخفیف"),
+    (r"(خرید|فروش)\s*(کن|آنلاین|اینترنتی)", 0.85, "تبلیغ خرید"),
+    (r"(درآمد|پول)\s*(میلیونی|میلیاردی|زیاد|عالی)", 0.95, "کلاهبرداری مالی"),
+    (r"(کسب\s*درآمد|پولدار|پول\s*دار)\s*(شو|کن)", 0.95, "کلاهبرداری مالی"),
+    (r"(بدون\s*سرمایه|رایگان|هدیه)\s*(شروع|کن)", 0.85, "تبلیغ فریبنده"),
+    (r"(ارسال\s*رایگان|ارسال\s*به\s*سراسر)", 0.85, "تبلیغ ارسال"),
+    (r"(گارانتی|ضمانت|اصالت)", 0.70, "تبلیغ ضمانت"),
+    (r"(محدود|فوری|آخرین\s*فرصت|تمام\s*شدنی)", 0.80, "تبلیغ فوری"),
+    (r"(واتساپ|whatsapp|تلگرام|telegram|اینستاگرام|instagram)\s*[:\s]*\d", 0.90, "اشتراک‌گذاری شماره"),
+    (r"(کلیک|click)\s*(کن|بکن|روی)", 0.85, "درخواست کلیک"),
+    (r"(ثبت\s*نام|عضویت)\s*(کن|کنید)", 0.75, "درخواست ثبت‌نام"),
+    (r"(جایزه|برنده|قرعه\s*کشی)\s*(شو|کن|بردی)", 0.95, "کلاهبرداری جایزه"),
+    (r"(هدیه|بونوس)\s*(رایگان|ویژه)", 0.85, "تبلیغ هدیه"),
+    (r"(شانس|فرصت)\s*(آخر|طلایی|ویژه)", 0.85, "تبلیغ فریبنده"),
+
+    # شماره تلفن و مالی
+    (r"09[0-9]{2}[\s\-]?[0-9]{3}[\s\-]?[0-9]{4}", 0.75, "اشتراک‌گذاری شماره"),
+    (r"(شماره|شماره\s*تماس|تلفن)\s*[:\s]*09", 0.85, "اشتراک‌گذاری شماره"),
+    (r"(کارت\s*به\s*کارت|واریز|واریزی)\s*[:\s]*\d", 0.90, "درخواست مالی"),
+    (r"(قیمت|تومان|ریال)\s*[:\s]*\d", 0.70, "قیمت‌گذاری"),
+    (r"(ارزان|ارزان\s*تر|بهترین\s*قیمت)", 0.75, "تبلیغ قیمت"),
+
+    # محتوای غیراخلاقی
+    (r"(فیلم|عکس|کلیپ)\s*(سکس|پورن|جنده|بدون\s*سانسور)", 0.98, "محتوای غیراخلاقی"),
+    (r"(سایت|سکس|پورن|xxx|adult)", 0.95, "محتوای غیراخلاقی"),
+    (r"(دختر|پسر)\s*(برای|میخواد|آماده)", 0.70, "محتوای مشکوک"),
 ]
 
-HATE_KEYWORDS = [
-    'احمق', 'بی‌عقل', 'نادان', 'کودن', 'اسکل', 'بی‌شرف',
-    'لعنت', 'بی‌ناموس', 'پدرسوخته', 'لاشی', 'خایه',
-    'بی‌غیرت', 'جوجه', 'بوزینه', 'خر', 'الاغ',
-    'خفه شو', 'برو گمشو', 'خفه', 'گمشو', 'برو بابا',
-    'بی‌خود', 'مزخرف', 'چرت', 'پرت', 'مسخره',
-    'کثافت', 'کثیف', 'چندش', 'حال‌بهم‌زن',
+# ---------------------------------------------------------------------------
+# الگوهای تشخیص نفرت و توهین
+# ---------------------------------------------------------------------------
+
+HATE_PATTERNS = [
+    # توهین‌های مستقیم
+    (r"(خفه|خفه\s*شو|خفه\s*شوید)", 0.95, "توهین مستقیم"),
+    (r"(برو\s*گمشو|گمشو|برید\s*گمشید)", 0.95, "توهین مستقیم"),
+    (r"(احمق|بی\s*عقل|نادان|کودن|اسکل|نفهم)", 0.90, "توهین هوشی"),
+    (r"(بی\s*شرف|بی\s*ناموس|بی\s*غیرت|بی\s*ناموس)", 0.95, "توهین خانوادگی"),
+    (r"(پدر\s*سوخته|لاشی|خایه|بی\s*ناموس)", 0.95, "توهین شدید"),
+    (r"(کثافت|کثیف|چندش|حال\s*بهم\s*زن|متعفن)", 0.90, "توهین بهداشتی"),
+    (r"(حرومزاده|حرامزاده|لاشخور|عوضی)", 0.95, "توهین شدید"),
+    (r"(دیوث|جنده|فاحشه|روسپی)", 0.95, "توهین جنسی"),
+    (r"(کیر|کص|کون|جنده)", 0.95, "توهین رکیک"),
+    (r"(مادر\s*قحبه|مادرت|خواهرت)", 0.90, "توهین خانوادگی"),
+    (r"(بکش|بمیر|مرده|لاش\s*شوی)", 0.90, "تهدید"),
+    (r"(برو\s*بمیر|بمیری|خدا\s*بکشدت)", 0.95, "تهدید"),
+    (r"(حیوان|حیوون|سگ|خر|الاغ|گاو|بوزینه)", 0.80, "توهین تشبیهی"),
+    (r"(بی\s*تربیت|بی\s*ادب|بی\s*فرهنگ)", 0.80, "توهین فرهنگی"),
+    (r"(مزخرف|چرت|پرت|مسخره|خنده\s*دار)", 0.70, "توهین خفیف"),
+    (r"(برو\s*بابا|اَه|اوف|ای\s*بابا)", 0.50, "توهین خفیف"),
+    (r"(لعنت|لعنتم|خدا\s*لعنتم)", 0.85, "نفرین"),
+    (r"(دشمن|دشمن\s*خدا|کافر)", 0.75, "توهین مذهبی"),
+    (r"(تروریست|داعشی|بعثی)", 0.85, "توهین سیاسی"),
+    (r"(عرب\s*بیابانی|افغانی|ترک\s*خر)", 0.90, "توهین نژادی"),
+    (r"(کور|کر|لال|معلول|عقیم)", 0.80, "توهین به معلولیت"),
+]
+
+# ---------------------------------------------------------------------------
+# الگوهای ضد اسپم (کاهش امتیاز)
+# ---------------------------------------------------------------------------
+
+NEGATIVE_PATTERNS = [
+    (r"(سلام|درود|صبح\s*بخیر|عصر\s*بخیر|شب\s*بخیر)", -0.30, "احوالپرسی"),
+    (r"(ممنون|متشکرم|سپاس|مرسی|دمت\s*گرم)", -0.25, "قدردانی"),
+    (r"(خوبی|خوبم|چطوری|حالت|حالم)", -0.20, "احوالپرسی"),
+    (r"(لطفا|خواهش|زحمت)", -0.15, "ادب"),
+    (r"(انشاءالله|به\s*امید\s*خدا|خدا\s*کنه)", -0.20, "مذهبی مثبت"),
+    (r"(موفق|موفقیت|پیروز|شاد)", -0.15, "مثبت"),
+    (r"(خدا|خدایا|یا\s*خدا)", -0.10, "مذهبی"),
+    (r"(^\s*$)", -1.0, "خالی"),
 ]
 
 
@@ -135,7 +220,7 @@ class SpamDetector:
                 self.model_loaded = True
                 logger.info("✅ مدل اسپم با موفقیت بارگذاری شد")
             else:
-                logger.warning("⚠️ فایل‌های مدل یافت نشد. از سیستم کلمات کلیدی استفاده می‌شود")
+                logger.warning("⚠️ فایل‌های مدل یافت نشد. از سیستم الگویی استفاده می‌شود")
 
         except Exception as e:
             logger.error(f"❌ خطا در بارگذاری مدل: {e}")
@@ -148,113 +233,173 @@ class SpamDetector:
         {
             'is_harmful': bool,
             'label': 'Normal' | 'Spam' | 'Hate',
-            'confidence': float,
+            'confidence': float (0-100),
             'warning_message': str,
             'warning_type': 'spam' | 'hate' | 'normal',
+            'details': list,
         }
         """
         if not text or not text.strip():
-            return self._normal_result()
+            return self._normal_result("متن خالی")
 
-        cleaned = clean_text(text)
+        # نرمال‌سازی متن
+        normalized = normalize_persian(text)
+
+        if len(normalized) < 2:
+            return self._normal_result("متن خیلی کوتاه")
 
         # اگر مدل آموزش‌دیده موجود باشد
         if self.model_loaded:
-            return self._predict_with_model(cleaned, text)
+            return self._predict_with_model(normalized, text)
 
-        # در غیر این صورت از سیستم کلمات کلیدی استفاده کن
-        return self._predict_with_keywords(cleaned, text)
+        # در غیر این صورت از سیستم الگویی استفاده کن
+        return self._predict_with_patterns(normalized, text)
 
-    def _predict_with_model(self, cleaned_text: str, original_text: str) -> dict:
+    def _predict_with_model(self, normalized: str, original: str) -> dict:
         """پیش‌بینی با مدل آموزش‌دیده"""
         try:
-            features = self.vectorizer.transform([cleaned_text])
+            from .preprocess import clean_text
+
+            cleaned = clean_text(original)
+            features = self.vectorizer.transform([cleaned])
             prediction = self.model.predict(features)[0]
 
             # دریافت امتیاز اطمینان
             if hasattr(self.model, 'decision_function'):
                 decision = self.model.decision_function(features)[0]
-                confidence = float(max(decision))
+                # تبدیل به احتمال با سیگموید
+                if len(decision.shape) > 0:
+                    max_score = float(max(decision))
+                    confidence = 1 / (1 + math.exp(-max_score)) * 100
+                else:
+                    confidence = 80.0
             else:
-                confidence = 0.8
+                confidence = 75.0
+
+            confidence = max(50, min(99, confidence))
 
             if prediction == 'Hate':
                 return {
                     'is_harmful': True,
                     'label': 'Hate',
-                    'confidence': min(confidence, 1.0),
-                    'warning_message': '⚠️ این پیام شامل محتوای نفرت‌انگیز یا توهین‌آمیز است.',
+                    'confidence': round(confidence, 1),
+                    'warning_message': '🚫 این پیام شامل محتوای نفرت‌انگیز یا توهین‌آمیز است.',
                     'warning_type': 'hate',
-                    'original_text': original_text,
+                    'original_text': original,
+                    'details': ['تشخیص با مدل آموزش‌دیده'],
                 }
             elif prediction == 'Spam':
                 return {
                     'is_harmful': True,
                     'label': 'Spam',
-                    'confidence': min(confidence, 1.0),
+                    'confidence': round(confidence, 1),
                     'warning_message': '⚠️ این پیام به عنوان اسپم شناسایی شد.',
                     'warning_type': 'spam',
-                    'original_text': original_text,
+                    'original_text': original,
+                    'details': ['تشخیص با مدل آموزش‌دیده'],
                 }
             else:
-                return self._normal_result()
+                return self._normal_result("پیام سالم")
 
         except Exception as e:
             logger.error(f"خطا در پیش‌بینی مدل: {e}")
-            return self._predict_with_keywords(cleaned_text, original_text)
+            return self._predict_with_patterns(normalized, original)
 
-    def _predict_with_keywords(self, cleaned_text: str, original_text: str) -> dict:
-        """پیش‌بینی با سیستم کلمات کلیدی (جایگزین)"""
-        text_lower = cleaned_text.lower()
-
-        # بررسی نفرت
+    def _predict_with_patterns(self, normalized: str, original: str) -> dict:
+        """پیش‌بینی با سیستم الگویی"""
         hate_score = 0
-        hate_matches = []
-        for keyword in HATE_KEYWORDS:
-            if keyword in text_lower:
-                hate_score += 1
-                hate_matches.append(keyword)
+        hate_details = []
+        hate_max_confidence = 0
 
-        # بررسی اسپم
         spam_score = 0
-        spam_matches = []
-        for keyword in SPAM_KEYWORDS:
-            if keyword in text_lower:
-                spam_score += 1
-                spam_matches.append(keyword)
+        spam_details = []
+        spam_max_confidence = 0
 
-        # اولویت با نفرت است
-        if hate_score >= 1:
+        negative_score = 0
+
+        # بررسی الگوهای نفرت
+        for pattern, weight, desc in HATE_PATTERNS:
+            if re.search(pattern, normalized):
+                hate_score += weight
+                hate_max_confidence = max(hate_max_confidence, weight)
+                hate_details.append(desc)
+
+        # بررسی الگوهای اسپم
+        for pattern, weight, desc in SPAM_PATTERNS:
+            if re.search(pattern, normalized):
+                spam_score += weight
+                spam_max_confidence = max(spam_max_confidence, weight)
+                spam_details.append(desc)
+
+        # بررسی الگوهای منفی (کاهش امتیاز)
+        for pattern, weight, desc in NEGATIVE_PATTERNS:
+            if re.search(pattern, normalized):
+                negative_score += weight
+
+        # محاسبه امتیاز نهایی
+        final_hate_score = max(0, hate_score + negative_score)
+        final_spam_score = max(0, spam_score + negative_score)
+
+        # تصمیم‌گیری نهایی
+        if final_hate_score >= 0.8 and final_hate_score > final_spam_score:
+            confidence = min(95, max(60, hate_max_confidence * 100))
             return {
                 'is_harmful': True,
                 'label': 'Hate',
-                'confidence': min(0.5 + (hate_score * 0.15), 0.95),
-                'warning_message': '⚠️ این پیام شامل محتوای نفرت‌انگیز یا توهین‌آمیز است.',
+                'confidence': round(confidence, 1),
+                'warning_message': '🚫 این پیام شامل محتوای نفرت‌انگیز یا توهین‌آمیز است.',
                 'warning_type': 'hate',
-                'original_text': original_text,
-                'matched_keywords': hate_matches,
+                'original_text': original,
+                'details': hate_details[:3],
             }
 
-        if spam_score >= 2:
+        if final_spam_score >= 0.7:
+            confidence = min(95, max(55, spam_max_confidence * 100))
             return {
                 'is_harmful': True,
                 'label': 'Spam',
-                'confidence': min(0.5 + (spam_score * 0.1), 0.9),
+                'confidence': round(confidence, 1),
                 'warning_message': '⚠️ این پیام به عنوان اسپم شناسایی شد.',
                 'warning_type': 'spam',
-                'original_text': original_text,
-                'matched_keywords': spam_matches,
+                'original_text': original,
+                'details': spam_details[:3],
             }
 
-        return self._normal_result()
+        # اگر امتیاز پایین بود ولی صفر نبود
+        if final_hate_score > 0.3 or final_spam_score > 0.3:
+            if final_hate_score > final_spam_score:
+                confidence = min(55, max(30, hate_max_confidence * 60))
+                return {
+                    'is_harmful': False,
+                    'label': 'Normal',
+                    'confidence': round(100 - confidence, 1),
+                    'warning_message': '💡 این پیام ممکن است مشکوک باشد.',
+                    'warning_type': 'normal',
+                    'original_text': original,
+                    'details': hate_details[:2],
+                }
+            else:
+                confidence = min(55, max(30, spam_max_confidence * 60))
+                return {
+                    'is_harmful': False,
+                    'label': 'Normal',
+                    'confidence': round(100 - confidence, 1),
+                    'warning_message': '💡 این پیام ممکن است مشکوک باشد.',
+                    'warning_type': 'normal',
+                    'original_text': original,
+                    'details': spam_details[:2],
+                }
 
-    def _normal_result(self) -> dict:
+        return self._normal_result("پیام سالم")
+
+    def _normal_result(self, reason: str = "") -> dict:
         return {
             'is_harmful': False,
             'label': 'Normal',
-            'confidence': 1.0,
+            'confidence': 95.0,
             'warning_message': '',
             'warning_type': 'normal',
+            'details': [reason] if reason else [],
         }
 
 

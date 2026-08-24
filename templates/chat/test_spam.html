@@ -3,7 +3,7 @@
 {% block title %}تست تشخیص اسپم{% endblock %}
 
 {% block content %}
-<div class="chat-container" style="max-width: 800px;">
+<div class="chat-container" style="max-width: 900px;">
     <div class="chat-header">
         <h2>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="var(--primary-light)" style="vertical-align: middle; margin-left: 8px;">
@@ -15,84 +15,115 @@
 
     <div class="card" style="margin-bottom: 20px;">
         <div class="card-body">
-            <form method="post">
+            <form method="post" id="test-form">
                 {% csrf_token %}
                 <div class="form-group">
                     <label class="form-label">متن مورد نظر را وارد کنید:</label>
                     <textarea 
                         name="text" 
+                        id="test-text"
                         class="form-input" 
                         rows="4" 
                         placeholder="متن فارسی خود را اینجا بنویسید..."
-                        style="direction: rtl;"
+                        style="direction: rtl; font-size: 1.1rem;"
                     >{{ test_text }}</textarea>
                 </div>
-                <button type="submit" class="btn btn-primary">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                    </svg>
-                    بررسی متن
-                </button>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-primary">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                        بررسی متن
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="clearForm()">
+                        پاک کردن
+                    </button>
+                </div>
             </form>
         </div>
     </div>
 
     {% if result %}
-    <div class="card">
+    <div class="card" style="margin-bottom: 20px;">
         <div class="card-header">
-            <h3 style="margin: 0;">نتیجه تحلیل</h3>
+            <h3 style="margin: 0;">📊 نتیجه تحلیل</h3>
         </div>
         <div class="card-body">
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
-                <div style="text-align: center; padding: 15px; background: var(--bg-input); border-radius: var(--radius-sm);">
-                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">وضعیت</div>
-                    <div style="font-size: 1.2rem; font-weight: 700; color: {% if result.is_harmful %}var(--danger){% else %}var(--success){% endif %};">
+            <!-- کارت‌های اطلاعات -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px;">
+                <div style="text-align: center; padding: 20px; background: var(--bg-input); border-radius: var(--radius); border: 2px solid {% if result.is_harmful %}var(--danger){% else %}var(--success){% endif %};">
+                    <div style="font-size: 2rem; margin-bottom: 8px;">
                         {% if result.is_harmful %}
-                            ⚠️ نامناسب
+                            {% if result.label == 'Hate' %}🚫{% else %}⚠️{% endif %}
                         {% else %}
-                            ✅ سالم
+                            ✅
+                        {% endif %}
+                    </div>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">وضعیت</div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: {% if result.is_harmful %}var(--danger){% else %}var(--success){% endif %};">
+                        {% if result.is_harmful %}
+                            نامناسب
+                        {% else %}
+                            سالم
                         {% endif %}
                     </div>
                 </div>
-                <div style="text-align: center; padding: 15px; background: var(--bg-input); border-radius: var(--radius-sm);">
+                <div style="text-align: center; padding: 20px; background: var(--bg-input); border-radius: var(--radius); border: 2px solid {% if result.label == 'Hate' %}var(--danger){% elif result.label == 'Spam' %}var(--warning){% else %}var(--success){% endif %};">
+                    <div style="font-size: 2rem; margin-bottom: 8px;">
+                        {% if result.label == 'Hate' %}😡{% elif result.label == 'Spam' %}📧{% else %}💬{% endif %}
+                    </div>
                     <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">دسته‌بندی</div>
-                    <div style="font-size: 1.2rem; font-weight: 700; color: {% if result.label == 'Hate' %}var(--danger){% elif result.label == 'Spam' %}var(--warning){% else %}var(--success){% endif %};">
+                    <div style="font-size: 1.1rem; font-weight: 700; color: {% if result.label == 'Hate' %}var(--danger){% elif result.label == 'Spam' %}var(--warning){% else %}var(--success){% endif %};">
                         {% if result.label == 'Hate' %}
-                            🚫 نفرت‌انگیز
+                            نفرت‌انگیز
                         {% elif result.label == 'Spam' %}
-                            📧 اسپم
+                            اسپم
                         {% else %}
-                            💬 عادی
+                            عادی
                         {% endif %}
                     </div>
                 </div>
-                <div style="text-align: center; padding: 15px; background: var(--bg-input); border-radius: var(--radius-sm);">
+                <div style="text-align: center; padding: 20px; background: var(--bg-input); border-radius: var(--radius); border: 2px solid var(--primary);">
+                    <div style="font-size: 2rem; margin-bottom: 8px;">📈</div>
                     <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">احتمال</div>
-                    <div style="font-size: 1.2rem; font-weight: 700; color: var(--primary-light);">
-                        {{ result.confidence|floatformat:0 }}%
+                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--primary-light);">
+                        {{ result.confidence }}%
                     </div>
                 </div>
             </div>
 
+            <!-- نوار پیشرفت احتمال -->
+            <div style="margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">میزان اطمینان تشخیص</span>
+                    <span style="font-size: 0.85rem; font-weight: 600; color: {% if result.is_harmful %}var(--danger){% else %}var(--success){% endif %};">{{ result.confidence }}%</span>
+                </div>
+                <div style="height: 10px; background: var(--bg-input); border-radius: 5px; overflow: hidden;">
+                    <div style="height: 100%; width: {{ result.confidence }}%; background: {% if result.is_harmful %}var(--danger){% else %}var(--success){% endif %}; border-radius: 5px; transition: width 0.5s ease;"></div>
+                </div>
+            </div>
+
+            <!-- هشدار -->
             {% if result.warning_message %}
-            <div class="spam-warning" style="margin: 0;">
+            <div class="spam-warning" style="margin: 0 0 20px 0;">
                 <div class="spam-warning-icon">
-                    {% if result.warning_type == 'hate' %}🚫{% else %}⚠️{% endif %}
+                    {% if result.warning_type == 'hate' %}🚫{% elif result.warning_type == 'spam' %}⚠️{% else %}💡{% endif %}
                 </div>
                 <div class="spam-warning-content">
-                    <h4>{% if result.warning_type == 'hate' %}محتوای نفرت‌انگیز{% else %}پیام اسپم{% endif %}</h4>
+                    <h4>{% if result.warning_type == 'hate' %}محتوای نفرت‌انگیز{% elif result.warning_type == 'spam' %}پیام اسپم{% else %}توجه{% endif %}</h4>
                     <p>{{ result.warning_message }}</p>
                 </div>
             </div>
             {% endif %}
 
-            {% if result.matched_keywords %}
-            <div style="margin-top: 15px;">
-                <h4 style="margin-bottom: 10px; color: var(--text-secondary);">کلمات کلیدی شناسایی شده:</h4>
+            <!-- جزئیات تشخیص -->
+            {% if result.details %}
+            <div style="background: var(--bg-input); border-radius: var(--radius-sm); padding: 15px;">
+                <h4 style="margin-bottom: 10px; color: var(--text-secondary); font-size: 0.9rem;">🔍 جزئیات تشخیص:</h4>
                 <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                    {% for keyword in result.matched_keywords %}
-                    <span style="background: var(--bg-input); padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; color: var(--warning);">
-                        {{ keyword }}
+                    {% for detail in result.details %}
+                    <span style="background: var(--bg-card); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; color: var(--text-primary); border: 1px solid var(--border);">
+                        {{ detail }}
                     </span>
                     {% endfor %}
                 </div>
@@ -102,28 +133,73 @@
     </div>
     {% endif %}
 
-    <div class="card" style="margin-top: 20px;">
+    <!-- نمونه‌های تست -->
+    <div class="card">
         <div class="card-header">
-            <h3 style="margin: 0;">نمونه‌های تست</h3>
+            <h3 style="margin: 0;">🧪 نمونه‌های تست</h3>
         </div>
         <div class="card-body">
-            <p style="color: var(--text-secondary); margin-bottom: 15px;">برای تست، متن‌های زیر را امتحان کنید:</p>
+            <p style="color: var(--text-secondary); margin-bottom: 15px;">برای تست، روی هر نمونه کلیک کنید:</p>
             
             <div style="display: grid; gap: 10px;">
-                <div style="padding: 12px; background: var(--bg-input); border-radius: var(--radius-sm); border-right: 3px solid var(--success);">
+                <div class="test-sample" onclick="setSample(this)" data-text="سلام دوستان، حالتون چطوره؟ امیدوارم خوب باشید" style="padding: 15px; background: var(--bg-input); border-radius: var(--radius-sm); border-right: 4px solid var(--success); cursor: pointer; transition: all 0.2s;">
                     <strong style="color: var(--success);">✅ عادی:</strong>
-                    <span style="color: var(--text-secondary);">سلام دوستان، حالتون چطوره؟</span>
+                    <span style="color: var(--text-secondary);">سلام دوستان، حالتون چطوره؟ امیدوارم خوب باشید</span>
                 </div>
-                <div style="padding: 12px; background: var(--bg-input); border-radius: var(--radius-sm); border-right: 3px solid var(--warning);">
+                <div class="test-sample" onclick="setSample(this)" data-text="سلاااام خوبی؟ عکس قشنگی بود ***" style="padding: 15px; background: var(--bg-input); border-radius: var(--radius-sm); border-right: 4px solid var(--success); cursor: pointer; transition: all 0.2s;">
+                    <strong style="color: var(--success);">✅ عادی (با کشیده):</strong>
+                    <span style="color: var(--text-secondary);">سلاااام خوبی؟ عکس قشنگی بود ***</span>
+                </div>
+                <div class="test-sample" onclick="setSample(this)" data-text="کانال تلگرام لینک بیو فالو کنید" style="padding: 15px; background: var(--bg-input); border-radius: var(--radius-sm); border-right: 4px solid var(--warning); cursor: pointer; transition: all 0.2s;">
                     <strong style="color: var(--warning);">📧 اسپم:</strong>
                     <span style="color: var(--text-secondary);">کانال تلگرام لینک بیو فالو کنید</span>
                 </div>
-                <div style="padding: 12px; background: var(--bg-input); border-radius: var(--radius-sm); border-right: 3px solid var(--danger);">
+                <div class="test-sample" onclick="setSample(this)" data-text="کد تخفیف ویژه 50 درصد فقط امروز! لینک بیو" style="padding: 15px; background: var(--bg-input); border-radius: var(--radius-sm); border-right: 4px solid var(--warning); cursor: pointer; transition: all 0.2s;">
+                    <strong style="color: var(--warning);">📧 اسپم:</strong>
+                    <span style="color: var(--text-secondary);">کد تخفیف ویژه 50 درصد فقط امروز! لینک بیو</span>
+                </div>
+                <div class="test-sample" onclick="setSample(this)" data-text="درآمد میلیونی بدون سرمایه! کلیک کنید" style="padding: 15px; background: var(--bg-input); border-radius: var(--radius-sm); border-right: 4px solid var(--warning); cursor: pointer; transition: all 0.2s;">
+                    <strong style="color: var(--warning);">📧 اسپم/کلاهبرداری:</strong>
+                    <span style="color: var(--text-secondary);">درآمد میلیونی بدون سرمایه! کلیک کنید</span>
+                </div>
+                <div class="test-sample" onclick="setSample(this)" data-text="خفه شو برو گمشو احمق" style="padding: 15px; background: var(--bg-input); border-radius: var(--radius-sm); border-right: 4px solid var(--danger); cursor: pointer; transition: all 0.2s;">
                     <strong style="color: var(--danger);">🚫 نفرت‌انگیز:</strong>
-                    <span style="color: var(--text-secondary);">خفه شو برو گمشو</span>
+                    <span style="color: var(--text-secondary);">خفه شو برو گمشو احمق</span>
+                </div>
+                <div class="test-sample" onclick="setSample(this)" data-text="ک.ی.ر تو دهنت" style="padding: 15px; background: var(--bg-input); border-radius: var(--radius-sm); border-right: 4px solid var(--danger); cursor: pointer; transition: all 0.2s;">
+                    <strong style="color: var(--danger);">🚫 نفرت‌انگیز (مبهم):</strong>
+                    <span style="color: var(--text-secondary);">ک.ی.ر تو دهنت</span>
+                </div>
+                <div class="test-sample" onclick="setSample(this)" data-text="برو بمیر حیوان بی شرف" style="padding: 15px; background: var(--bg-input); border-radius: var(--radius-sm); border-right: 4px solid var(--danger); cursor: pointer; transition: all 0.2s;">
+                    <strong style="color: var(--danger);">🚫 نفرت‌انگیز:</strong>
+                    <span style="color: var(--text-secondary);">برو بمیر حیوان بی شرف</span>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    function setSample(element) {
+        const text = element.getAttribute('data-text');
+        document.getElementById('test-text').value = text;
+        document.getElementById('test-form').submit();
+    }
+
+    function clearForm() {
+        document.getElementById('test-text').value = '';
+    }
+
+    // هاور روی نمونه‌ها
+    document.querySelectorAll('.test-sample').forEach(el => {
+        el.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateX(-5px)';
+            this.style.background = 'var(--bg-card)';
+        });
+        el.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateX(0)';
+            this.style.background = 'var(--bg-input)';
+        });
+    });
+</script>
 {% endblock %}
