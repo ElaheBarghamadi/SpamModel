@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block title %}تست فایل{% endblock %}
+
+{% block content %}
+<h1 style="font-size: 1.8rem; margin-bottom: 24px;">📁 تست با فایل</h1>
+
+{% if error %}
+<div class="card" style="border-color: var(--danger);">
+    <div class="card-body" style="color: var(--danger);">
+        ❌ {{ error }}
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">📤 آپلود فایل</div>
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <div class="upload-area" onclick="document.getElementById('file-input').click()">
+                    <div style="font-size: 3rem; margin-bottom: 12px;">📄</div>
+                    <div style="font-weight: 600; margin-bottom: 8px;">فایل خود را انتخاب کنید</div>
+                    <div style="color: var(--text-secondary); font-size: 0.85rem;">
+                        فرمت‌های مجاز: CSV (با ستون text) یا TXT (هر خط یک متن)
+                    </div>
+                    <div id="file-name" style="margin-top: 12px; color: var(--primary); font-weight: 600;"></div>
+                </div>
+                <input type="file" id="file-input" name="file" accept=".csv,.txt" style="display: none;" onchange="showFileName(this)">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">
+                🔍 تحلیل فایل
+            </button>
+        </form>
+    </div>
+</div>
+
+{% if summary %}
+<!-- خلاصه نتایج -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ summary.total }}</div>
+        <div class="stat-label">کل پیام‌ها</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color: var(--success);">{{ summary.ham }}</div>
+        <div class="stat-label">عادی ({{ summary.ham_percent }}%)</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color: var(--danger);">{{ summary.spam }}</div>
+        <div class="stat-label">اسپم ({{ summary.spam_percent }}%)</div>
+    </div>
+</div>
+
+<!-- نوار نسبت -->
+<div class="card">
+    <div class="card-header">📊 نسبت اسپم به عادی</div>
+    <div class="card-body">
+        <div style="display: flex; gap: 4px; height: 40px; border-radius: 8px; overflow: hidden;">
+            <div style="width: {{ summary.ham_percent }}%; background: var(--success); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.85rem;">
+                {{ summary.ham_percent }}%
+            </div>
+            <div style="width: {{ summary.spam_percent }}%; background: var(--danger); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.85rem;">
+                {{ summary.spam_percent }}%
+            </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.85rem; color: var(--text-secondary);">
+            <span>✅ عادی</span>
+            <span>🚫 اسپم</span>
+        </div>
+    </div>
+</div>
+
+<!-- جدول نتایج -->
+<div class="card">
+    <div class="card-header">📋 نتایج تحلیل</div>
+    <div class="card-body" style="overflow-x: auto;">
+        <table class="table">
+            <tr>
+                <th>#</th>
+                <th>متن</th>
+                <th>نتیجه</th>
+                <th>احتمال</th>
+            </tr>
+            {% for r in results %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td style="max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    {{ r.input_text|truncatechars:80 }}
+                </td>
+                <td>
+                    <span class="badge {% if r.label == 'spam' %}badge-spam{% else %}badge-ham{% endif %}">
+                        {{ r.label_fa }}
+                    </span>
+                </td>
+                <td>{{ r.confidence }}%</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function showFileName(input) {
+    const fileName = input.files[0] ? input.files[0].name : '';
+    document.getElementById('file-name').textContent = fileName ? '📎 ' + fileName : '';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 style="font-size: 1.8rem; margin-bottom: 24px;">
+    🔍 سیستم تشخیص اسپم فارسی
+</h1>
+
+<!-- آمار -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{% if model_info %}{{ model_info.accuracy }}%{% else %}--{% endif %}</div>
+        <div class="stat-label">دقت مدل</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{% if model_info %}{{ model_info.precision }}%{% else %}--{% endif %}</div>
+        <div class="stat-label">Precision</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{% if model_info %}{{ model_info.recall }}%{% else %}--{% endif %}</div>
+        <div class="stat-label">Recall</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{% if model_info %}{{ model_info.f1 }}%{% else %}--{% endif %}</div>
+        <div class="stat-label">F1-Score</div>
+    </div>
+</div>
+
+<!-- وضعیت -->
+<div class="card">
+    <div class="card-header">📊 وضعیت سیستم</div>
+    <div class="card-body">
+        <table class="table">
+            <tr>
+                <th>دیتاست</th>
+                <td>
+                    {% if dataset_exists %}
+                        <span class="badge badge-ham">✅ موجود</span>
+                    {% else %}
+                        <span class="badge badge-spam">❌ یافت نشد</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th>مدل</th>
+                <td>
+                    {% if model_exists %}
+                        <span class="badge badge-ham">✅ آموزش دیده</span>
+                    {% else %}
+                        <span class="badge badge-spam">⚠️ آموزش داده نشده</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% if model_info %}
+            <tr>
+                <th>تعداد نمونه‌ها</th>
+                <td>{{ model_info.total_samples }}</td>
+            </tr>
+            <tr>
+                <th>نمونه آموزش</th>
+                <td>{{ model_info.train_size }}</td>
+            </tr>
+            <tr>
+                <th>نمونه تست</th>
+                <td>{{ model_info.test_size }}</td>
+            </tr>
+            <tr>
+                <th>تعداد ویژگی‌ها</th>
+                <td>{{ model_info.features }}</td>
+            </tr>
+            {% endif %}
+        </table>
+    </div>
+</div>
+
+<!-- ماتریس اغتشاش -->
+{% if model_info and model_info.confusion_matrix %}
+<div class="card">
+    <div class="card-header">📈 ماتریس اغتشاش (Confusion Matrix)</div>
+    <div class="card-body">
+        <table class="table" style="max-width: 400px; margin: 0 auto;">
+            <tr>
+                <th></th>
+                <th>پیش‌بینی: عادی</th>
+                <th>پیش‌بینی: اسپم</th>
+            </tr>
+            <tr>
+                <th>واقعی: عادی</th>
+                <td style="background: rgba(16,185,129,0.1); font-weight: 700;">{{ model_info.confusion_matrix.0.0 }}</td>
+                <td style="background: rgba(239,68,68,0.1);">{{ model_info.confusion_matrix.0.1 }}</td>
+            </tr>
+            <tr>
+                <th>واقعی: اسپم</th>
+                <td style="background: rgba(239,68,68,0.1);">{{ model_info.confusion_matrix.1.0 }}</td>
+                <td style="background: rgba(16,185,129,0.1); font-weight: 700;">{{ model_info.confusion_matrix.1.1 }}</td>
+            </tr>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- نمونه دیتاست -->
+{% if dataset_preview %}
+<div class="card">
+    <div class="card-header">📋 نمونه دیتاست</div>
+    <div class="card-body" style="overflow-x: auto;">
+        <table class="table">
+            <tr>
+                <th>متن</th>
+                <th>لیبل</th>
+            </tr>
+            {% for row in dataset_preview %}
+            <tr>
+                <td style="max-width: 500px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ row.text|truncatechars:100 }}</td>
+                <td>
+                    <span class="badge {% if row.label == 'spam' %}badge-spam{% else %}badge-ham{% endif %}">
+                        {{ row.label }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- دکمه‌ها -->
+<div style="display: flex; gap: 12px; flex-wrap: wrap;">
+    <a href="{% url 'train' %}" class="btn btn-primary">🤖 آموزش مدل</a>
+    <a href="{% url 'test_text' %}" class="btn btn-secondary">📝 تست متن</a>
+    <a href="{% url 'test_file' %}" class="btn btn-secondary">📁 تست فایل</a>
+</div>
+{% endblock %}

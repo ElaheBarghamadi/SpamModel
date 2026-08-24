@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+
+{% block title %}آموزش مدل{% endblock %}
+
+{% block content %}
+<h1 style="font-size: 1.8rem; margin-bottom: 24px;">🤖 آموزش مدل</h1>
+
+{% if error %}
+<div class="card" style="border-color: var(--danger);">
+    <div class="card-body" style="color: var(--danger);">
+        ❌ {{ error }}
+    </div>
+</div>
+{% endif %}
+
+{% if success %}
+<!-- نتایج آموزش -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ model_info.accuracy }}%</div>
+        <div class="stat-label">دقت (Accuracy)</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ model_info.precision }}%</div>
+        <div class="stat-label">Precision</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ model_info.recall }}%</div>
+        <div class="stat-label">Recall</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ model_info.f1 }}%</div>
+        <div class="stat-label">F1-Score</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">📈 گزارش طبقه‌بندی</div>
+    <div class="card-body" style="overflow-x: auto;">
+        <table class="table">
+            <tr>
+                <th>کلاس</th>
+                <th>Precision</th>
+                <th>Recall</th>
+                <th>F1-Score</th>
+                <th>تعداد</th>
+            </tr>
+            {% for class_name, metrics in report.items %}
+            {% if class_name != 'accuracy' and class_name != 'macro avg' and class_name != 'weighted avg' %}
+            <tr>
+                <td>
+                    <span class="badge {% if class_name == 'spam' %}badge-spam{% else %}badge-ham{% endif %}">
+                        {{ class_name }}
+                    </span>
+                </td>
+                <td>{{ metrics.precision|floatformat:2 }}</td>
+                <td>{{ metrics.recall|floatformat:2 }}</td>
+                <td>{{ metrics.f1-score|floatformat:2 }}</td>
+                <td>{{ metrics.support }}</td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">📊 ماتریس اغتشاش</div>
+    <div class="card-body">
+        <table class="table" style="max-width: 400px; margin: 0 auto;">
+            <tr>
+                <th></th>
+                <th>پیش‌بینی: عادی</th>
+                <th>پیش‌بینی: اسپم</th>
+            </tr>
+            <tr>
+                <th>واقعی: عادی</th>
+                <td style="background: rgba(16,185,129,0.1); font-weight: 700;">{{ model_info.confusion_matrix.0.0 }}</td>
+                <td style="background: rgba(239,68,68,0.1);">{{ model_info.confusion_matrix.0.1 }}</td>
+            </tr>
+            <tr>
+                <th>واقعی: اسپم</th>
+                <td style="background: rgba(239,68,68,0.1);">{{ model_info.confusion_matrix.1.0 }}</td>
+                <td style="background: rgba(16,185,129,0.1); font-weight: 700;">{{ model_info.confusion_matrix.1.1 }}</td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<div style="display: flex; gap: 12px;">
+    <a href="{% url 'test_text' %}" class="btn btn-primary">📝 تست متن</a>
+    <a href="{% url 'test_file' %}" class="btn btn-secondary">📁 تست فایل</a>
+</div>
+
+{% else %}
+<!-- فرم آموزش -->
+<div class="card">
+    <div class="card-header">⚙️ تنظیمات آموزش</div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label class="form-label">نسبت تست (Test Size)</label>
+                <select name="test_size" class="form-select">
+                    <option value="0.1">10% تست / 90% آموزش</option>
+                    <option value="0.2" selected>20% تست / 80% آموزش</option>
+                    <option value="0.3">30% تست / 70% آموزش</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">
+                🚀 شروع آموزش
+            </button>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

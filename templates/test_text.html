@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block title %}تست متن{% endblock %}
+
+{% block content %}
+<h1 style="font-size: 1.8rem; margin-bottom: 24px;">📝 تست با متن</h1>
+
+<div class="card">
+    <div class="card-header">✍️ متن خود را وارد کنید</div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <textarea 
+                    name="text" 
+                    class="form-textarea" 
+                    placeholder="متن فارسی خود را اینجا بنویسید..."
+                    rows="5"
+                >{% if result %}{{ result.input_text }}{% endif %}</textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">
+                🔍 بررسی کن
+            </button>
+        </form>
+    </div>
+</div>
+
+{% if result %}
+{% if result.error %}
+<div class="card" style="border-color: var(--danger);">
+    <div class="card-body" style="color: var(--danger);">
+        ❌ {{ result.error }}
+    </div>
+</div>
+{% else %}
+<div class="result-box {% if result.label == 'spam' %}result-spam{% else %}result-ham{% endif %}">
+    <div class="result-header">
+        <div class="result-icon">
+            {% if result.label == 'spam' %}🚫{% else %}✅{% endif %}
+        </div>
+        <div>
+            <div class="result-title">
+                {% if result.label == 'spam' %}اسپم شناسایی شد!{% else %}پیام عادی{% endif %}
+            </div>
+            <span class="result-confidence">
+                احتمال: {{ result.confidence }}%
+            </span>
+        </div>
+    </div>
+    
+    <div style="margin-top: 12px; padding: 12px; background: rgba(0,0,0,0.05); border-radius: 8px;">
+        <strong>متن پاکسازی شده:</strong>
+        <div style="margin-top: 4px; color: var(--text-secondary);">{{ result.cleaned_text }}...</div>
+    </div>
+</div>
+{% endif %}
+{% endif %}
+
+<!-- نمونه‌های تست -->
+<div class="card" style="margin-top: 24px;">
+    <div class="card-header">🧪 نمونه‌های تست</div>
+    <div class="card-body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">روی هر نمونه کلیک کنید:</p>
+        
+        <div style="display: grid; gap: 8px;">
+            <div class="sample-item" onclick="setSample(this)" data-text="سلام دوستان، حالتون چطوره؟" style="padding: 12px; background: var(--bg); border-radius: 8px; cursor: pointer; border-right: 3px solid var(--success);">
+                <span class="badge badge-ham">عادی</span>
+                سلام دوستان، حالتون چطوره؟
+            </div>
+            <div class="sample-item" onclick="setSample(this)" data-text="کانال تلگرام لینک بیو فالو کنید" style="padding: 12px; background: var(--bg); border-radius: 8px; cursor: pointer; border-right: 3px solid var(--danger);">
+                <span class="badge badge-spam">اسپم</span>
+                کانال تلگرام لینک بیو فالو کنید
+            </div>
+            <div class="sample-item" onclick="setSample(this)" data-text="درآمد میلیونی بدون سرمایه! کلیک کنید" style="padding: 12px; background: var(--bg); border-radius: 8px; cursor: pointer; border-right: 3px solid var(--danger);">
+                <span class="badge badge-spam">اسپم</span>
+                درآمد میلیونی بدون سرمایه! کلیک کنید
+            </div>
+            <div class="sample-item" onclick="setSample(this)" data-text="ممنون از راهنماییتون" style="padding: 12px; background: var(--bg); border-radius: 8px; cursor: pointer; border-right: 3px solid var(--success);">
+                <span class="badge badge-ham">عادی</span>
+                ممنون از راهنماییتون
+            </div>
+            <div class="sample-item" onclick="setSample(this)" data-text="کد تخفیف ویژه 50 درصد فقط امروز!" style="padding: 12px; background: var(--bg); border-radius: 8px; cursor: pointer; border-right: 3px solid var(--danger);">
+                <span class="badge badge-spam">اسپم</span>
+                کد تخفیف ویژه 50 درصد فقط امروز!
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function setSample(el) {
+    document.querySelector('textarea[name="text"]').value = el.dataset.text;
+}
+</script>
+{% endblock %}
