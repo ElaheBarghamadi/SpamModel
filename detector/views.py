@@ -1,57 +1,43 @@
+# -*- coding: utf-8 -*-
 import os
 import json
-import csv
-import io
 import joblib
 import pandas as pd
-from django.shortcuts import render, redirect
+from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.svm import LinearSVC
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import (
-    classification_report, accuracy_score, 
-    precision_score, recall_score, f1_score,
-    confusion_matrix
-)
 
-
-def clean_text(text):
-    """پیش‌پردازش ساده متن فارسی"""
-    import re
-    if not isinstance(text, str):
-        return ""
-    # حذف کاراکترهای اضافی
-    text = re.sub(r'[^\u0600-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF0-9a-zA-Z\s]', ' ', text)
-    text = re.sub(r'\s+', ' ', text).strip()
-    return text.lower()
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from detector.ml import core
 
 
 def home(request):
     """صفحه اصلی"""
-    model_exists = os.path.exists(settings.MODEL_PATH)
-    dataset_exists = os.path.exists(settings.DATASET_PATH)
-    
-    # خواندن اطلاعات مدل ذخیره شده
+    model_path = os.path.join(settings.BASE_DIR, 'saved_models', core.MODEL_FILENAME)
+    metadata_path = os.path.join(settings.BASE_DIR, 'saved_models', 'metadata.json')
+    dataset_path = os.path.join(settings.BASE_DIR, 'data', 'emails.csv')
+
+    model_exists = os.path.exists(model_path)
+    dataset_exists = os.path.exists(dataset_path)
+
     model_info = None
-    if model_exists:
+    if os.path.exists(metadata_path):
         try:
-            with open(settings.BASE_DIR / 'models' / 'model_info.json', 'r') as f:
+            with open(metadata_path, 'r', encoding='utf-8') as f:
                 model_info = json.load(f)
         except:
             pass
-    
-    # خواندن نمونه دیتاست
+
     dataset_preview = []
     if dataset_exists:
         try:
-            df = pd.read_csv(settings.DATASET_PATH, nrows=5)
+            df = pd.read_csv(dataset_path, nrows=5)
             dataset_preview = df.to_dict('records')
         except:
             pass
-    
+
     context = {
         'model_exists': model_exists,
         'dataset_exists': dataset_exists,
@@ -63,98 +49,106 @@ def home(request):
 
 def train_model(request):
     """آموزش مدل"""
-    if not os.path.exists(settings.DATASET_PATH):
+    import time
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import (
+        accuracy_score, precision_score, recall_score,
+        f1_score, roc_auc_score, confusion_matrix, classification_report
+    )
+
+    dataset_path = os.path.join(settings.BASE_DIR, 'data', 'emails.csv')
+    if not os.path.exists(dataset_path):
         return render(request, 'train.html', {'error': 'فایل دیتاست یافت نشد!'})
-    
+
     if request.method == 'POST':
-        # خواندن دیتاست
-        df = pd.read_csv(settings.DATASET_PATH)
-        
-        # پیش‌پردازش
-        df['cleaned'] = df['text'].apply(clean_text)
-        df = df[df['cleaned'].str.strip() != '']
-        
-        # تقسیم داده
-        X = df['cleaned']
-        y = df['label']
-        
+        df = pd.read_csv(dataset_path)
+        df = df.dropna(subset=["text", "label"]).reset_index(drop=True)
+
+        # تبدیل label
+        label_map = {"ham": 0, "spam": 1, "0": 0, "1": 1, 0: 0, 1: 1}
+        df["label"] = df["label"].map(label_map)
+        df = df.dropna(subset=["label"]).reset_index(drop=True)
+        df["label"] = df["label"].astype(int)
+
         test_size = float(request.POST.get('test_size', 0.2))
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=42, stratify=y
+
+        train_df, test_df = train_test_split(
+            df, test_size=test_size, random_state=42, stratify=df["label"]
         )
-        
-        # ساخت TF-IDF
-        vectorizer = TfidfVectorizer(
-            ngram_range=(1, 2),
-            min_df=2,
-            max_df=0.95,
-            sublinear_tf=True,
-        )
-        X_train_tfidf = vectorizer.fit_transform(X_train)
-        X_test_tfidf = vectorizer.transform(X_test)
-        
-        # آموزش مدل
-        model = LinearSVC(C=1.0, max_iter=10000, random_state=42, class_weight='balanced')
-        model.fit(X_train_tfidf, y_train)
-        
+
+        X_train = core.as_model_input(train_df["text"])
+        y_train = train_df["label"].values
+        X_test = core.as_model_input(test_df["text"])
+        y_test = test_df["label"].values
+
+        # آموزش
+        t0 = time.time()
+        clf = core.get_classifier()
+        pipe = core.build_pipeline(clf)
+        pipe.fit(X_train, y_train)
+        train_time = time.time() - t0
+
         # ارزیابی
-        y_pred = model.predict(X_test_tfidf)
-        
-        accuracy = accuracy_score(y_test, y_pred)
-        precision = precision_score(y_test, y_pred, pos_label='spam')
-        recall = recall_score(y_test, y_pred, pos_label='spam')
-        f1 = f1_score(y_test, y_pred, pos_label='spam')
-        
-        report = classification_report(y_test, y_pred, target_names=['ham', 'spam'], output_dict=True)
-        cm = confusion_matrix(y_test, y_pred)
-        
-        # تبدیل کلید f1-score به f1_score
+        proba_test = pipe.predict_proba(X_test)[:, 1]
+        pred_test = (proba_test >= 0.5).astype(int)
+
+        acc = accuracy_score(y_test, pred_test)
+        prec = precision_score(y_test, pred_test)
+        rec = recall_score(y_test, pred_test)
+        f1 = f1_score(y_test, pred_test)
+        roc_auc = roc_auc_score(y_test, proba_test)
+        cm = confusion_matrix(y_test, pred_test).tolist()
+
+        report = classification_report(y_test, pred_test, target_names=["ham", "spam"], output_dict=True)
+
+        # ذخیره مدل
+        os.makedirs(os.path.join(settings.BASE_DIR, 'saved_models'), exist_ok=True)
+        save_path = os.path.join(settings.BASE_DIR, 'saved_models', core.MODEL_FILENAME)
+        joblib.dump({"pipeline": pipe, "threshold": 0.5}, save_path)
+
+        # ذخیره متادیتا
+        metadata = {
+            "display_name": core.MODEL_NAME,
+            "n_samples_total": len(df),
+            "n_train": len(train_df),
+            "n_test": len(test_df),
+            "test_accuracy": round(acc, 4),
+            "test_precision": round(prec, 4),
+            "test_recall": round(rec, 4),
+            "test_f1": round(f1, 4),
+            "test_roc_auc": round(roc_auc, 4),
+            "confusion_matrix": cm,
+            "train_time_seconds": round(train_time, 1),
+        }
+        metadata_path = os.path.join(settings.BASE_DIR, 'saved_models', 'metadata.json')
+        with open(metadata_path, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
+
+        # تبدیل کلید f1-score
         for key in report:
             if isinstance(report[key], dict) and 'f1-score' in report[key]:
                 report[key]['f1_score'] = report[key].pop('f1-score')
-        
-        # ذخیره مدل
-        os.makedirs(settings.BASE_DIR / 'models', exist_ok=True)
-        joblib.dump(model, settings.MODEL_PATH)
-        joblib.dump(vectorizer, settings.VECTORIZER_PATH)
-        
-        # ذخیره اطلاعات مدل
-        model_info = {
-            'accuracy': round(accuracy * 100, 2),
-            'precision': round(precision * 100, 2),
-            'recall': round(recall * 100, 2),
-            'f1': round(f1 * 100, 2),
-            'train_size': len(X_train),
-            'test_size': len(X_test),
-            'total_samples': len(df),
-            'features': X_train_tfidf.shape[1],
-            'confusion_matrix': cm.tolist(),
-            'report': report,
-        }
-        
-        with open(settings.BASE_DIR / 'models' / 'model_info.json', 'w') as f:
-            json.dump(model_info, f)
-        
+
         context = {
             'success': True,
-            'model_info': model_info,
+            'model_info': metadata,
             'report': report,
         }
         return render(request, 'train.html', context)
-    
+
     return render(request, 'train.html')
 
 
 def test_text(request):
     """تست با متن"""
     result = None
-    
+
     if request.method == 'POST':
         text = request.POST.get('text', '')
         if text:
             result = predict_text(text)
             result['input_text'] = text
-    
+
     return render(request, 'test_text.html', {'result': result})
 
 
@@ -162,11 +156,10 @@ def test_file(request):
     """تست با فایل"""
     results = None
     summary = None
-    
+
     if request.method == 'POST' and request.FILES.get('file'):
         file = request.FILES['file']
-        
-        # خواندن فایل
+
         try:
             if file.name.endswith('.csv'):
                 df = pd.read_csv(file)
@@ -177,16 +170,14 @@ def test_file(request):
                 else:
                     return render(request, 'test_file.html', {'error': 'ستون text یافت نشد'})
             else:
-                # فایل متنی
                 content = file.read().decode('utf-8')
                 texts = [line.strip() for line in content.split('\n') if line.strip()]
-            
-            # پیش‌بینی
+
             results = []
             spam_count = 0
             ham_count = 0
-            
-            for text in texts[:1000]:  # حداکثر 1000 خط
+
+            for text in texts[:1000]:
                 if text and str(text) != 'nan':
                     pred = predict_text(str(text))
                     results.append(pred)
@@ -194,7 +185,7 @@ def test_file(request):
                         spam_count += 1
                     else:
                         ham_count += 1
-            
+
             summary = {
                 'total': len(results),
                 'spam': spam_count,
@@ -204,7 +195,7 @@ def test_file(request):
             }
         except Exception as e:
             return render(request, 'test_file.html', {'error': str(e)})
-    
+
     return render(request, 'test_file.html', {'results': results, 'summary': summary})
 
 
@@ -225,28 +216,25 @@ def api_predict(request):
 
 
 def predict_text(text):
-    """پیش‌بینی یک متن"""
-    if not os.path.exists(settings.MODEL_PATH):
+    """پیش‌بینی یک متن با مدل آموزش‌دیده"""
+    model_path = os.path.join(settings.BASE_DIR, 'saved_models', core.MODEL_FILENAME)
+
+    if not os.path.exists(model_path):
         return {'error': 'مدل آموزش داده نشده', 'label': None, 'confidence': 0}
-    
-    model = joblib.load(settings.MODEL_PATH)
-    vectorizer = joblib.load(settings.VECTORIZER_PATH)
-    
-    cleaned = clean_text(text)
-    features = vectorizer.transform([cleaned])
-    prediction = model.predict(features)[0]
-    
-    # محاسبه اطمینان
-    if hasattr(model, 'decision_function'):
-        decision = model.decision_function(features)[0]
-        confidence = abs(float(decision))
-        confidence = min(99, max(55, 50 + confidence * 50))
-    else:
-        confidence = 75.0
-    
+
+    saved = joblib.load(model_path)
+    pipe = saved["pipeline"]
+    threshold = saved.get("threshold", 0.5)
+
+    X = core.as_model_input([text])
+    proba = pipe.predict_proba(X)[:, 1][0]
+    label = "spam" if proba >= threshold else "ham"
+    confidence = round(abs(proba - 0.5) * 200, 1)  # تبدیل به درصد اطمینان
+    confidence = min(99, max(50, confidence))
+
     return {
-        'label': prediction,
-        'label_fa': 'اسپم' if prediction == 'spam' else 'عادی',
-        'confidence': round(confidence, 1),
-        'cleaned_text': cleaned[:100],
+        'label': label,
+        'label_fa': 'اسپم' if label == 'spam' else 'عادی',
+        'confidence': confidence,
+        'probability': round(proba * 100, 1),
     }
