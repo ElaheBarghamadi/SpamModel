@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Core ML code for Persian Spam Detection
-نسخه بهبود یافته - ضد اورفیت + دقت بالا
+نسخه فوق حرفه‌ای - دقت بالا + ضد اورفیت
 """
 
 import re
@@ -10,63 +10,64 @@ import pandas as pd
 
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import StandardScaler, MaxAbsScaler
+from sklearn.preprocessing import MaxAbsScaler
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score, StratifiedKFold
+from sklearn.ensemble import VotingClassifier, RandomForestClassifier, GradientBoostingClassifier
+from sklearn.svm import LinearSVC
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.model_selection import cross_val_predict, StratifiedKFold
 
 RANDOM_STATE = 42
 
 # ----------------------------------------------------------------
-# تنظیمات بهینه‌شده TF-IDF
+# تنظیمات TF-IDF
 # ----------------------------------------------------------------
-# کاهش max_features و افزایش min_df برای جلوگیری از اورفیت
-MAX_TFIDF_FEATURES = 8000
-MIN_DF = 3
-MAX_DF = 0.85
+MAX_TFIDF_FEATURES = 12000
+MIN_DF = 2
+MAX_DF = 0.9
 
 # ----------------------------------------------------------------
-# Persian text preprocessing
+# کلمات کلیدی اسپم فارسی
 # ----------------------------------------------------------------
-URL_RE = re.compile(r"(https?://\S+|www\.\S+)")
-EMAIL_RE = re.compile(r"[\w.\-]+@[\w\-]+\.[a-zA-Z]{2,}")
-PHONE_RE = re.compile(r"(?:\+?\d{1,3}[\s\-]?)?(?:09\d{9}|0\d{9,10})")
-MENTION_RE = re.compile(r"@\w+")
-HASHTAG_RE = re.compile(r"#(\w+)")
-ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
-PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")
-REPEAT_RE = re.compile(r"(.)\1{2,}")
-TATWEEL_RE = re.compile(r"[\u0640ـ]+")
-EMOJI_RE = re.compile(
-    "[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF]"
-)
+SPAM_KEYWORDS = [
+    'کانال', 'تلگرام', 'لینک', 'بیو', 'فالو', 'لایک', 'سابسکرایب',
+    'تخفیف', 'ویژه', 'خرید', 'فروش', 'قیمت', 'ارزان', 'رایگان',
+    'کلیک', 'کنید', 'بزنید', 'برید', 'عضو', 'شدید', 'برنده',
+    'جایزه', 'هدیه', 'بونوس', 'تومان', 'ریال', 'پرداخت',
+    'درآمد', 'میلیونی', 'پولدار', 'سرمایه', 'سود', 'فروشگاه',
+    'سفارش', 'ارسال', 'پست', 'تحویل', 'گارانتی', 'ضمانت',
+    'محدود', 'فوری', 'آخرین', 'فرصت', 'تمام', 'شدنی',
+    'ثبت', 'نام', 'عضویت', 'کد', 'تخفیف', 'OFF', 'SALE',
+    'whatsapp', 'telegram', 'instagram', 'اینستاگرام', 'واتساپ',
+    '091', '092', '093', '090', '099',
+]
 
-CENSOR_CHARS = r"*٭+#~_\.\-•"
-CENSOR_RE = re.compile(rf"([\u0600-\u06FFA-Za-z])[{CENSOR_CHARS}]+(?=[\u0600-\u06FFA-Za-z])")
-
-KNOWN_TOKENS = {
-    "URLTOKEN", "EMAILTOKEN", "PHONETOKEN", "MENTIONTOKEN",
-    "HASHTAGTOKEN", "REPEATEDCHARTOKEN", "ENGWORDTOKEN",
-}
-GENERIC_ENGLISH_RE = re.compile(r"[A-Za-z]{2,}")
-MULTI_ENGWORD_RE = re.compile(r"(?: ENGWORDTOKEN){2,}")
+NORMAL_KEYWORDS = [
+    'سلام', 'درود', 'ممنون', 'متشکرم', 'مرسی', 'خوبی', 'خوبم',
+    'چطوری', 'حالت', 'لطفا', 'خواهش', 'ببخشید', 'ببخش',
+    'خدا', 'انشاءال', 'موفق', 'موفقیت', 'شاد', 'سلامت',
+    'دوست', 'رفیق', 'داداش', 'آقا', 'خانم', 'استاد',
+    'درس', 'دانشگاه', 'کنکور', 'ارشد', 'دکتری', 'تحصیل',
+    'کتاب', 'مقاله', 'تحقیق', 'پروژه', 'تمرین', 'امتحان',
+]
 
 
 def normalize_persian(text):
     text = str(text)
-    text = text.lstrip("\ufeff")
-    text = text.replace("\ufeff", "")
+    text = text.lstrip("\ufeff").replace("\ufeff", "")
     text = text.replace("ي", "ی").replace("ك", "ک")
     text = text.replace("\u200c", " ")
-    text = TATWEEL_RE.sub("", text)
-    text = text.translate(ARABIC_DIGITS).translate(PERSIAN_DIGITS)
+    text = re.compile(r"[\u0640ـ]+").sub("", text)
+    text = text.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
+    text = text.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789"))
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
 
 def desensor_text(text):
+    CENSOR_RE = re.compile(r"([\u0600-\u06FFA-Za-z])[*٭+#~_.\-•]+(?=[\u0600-\u06FFA-Za-z])")
     prev = None
     while prev != text:
         prev = text
@@ -74,76 +75,43 @@ def desensor_text(text):
     return text
 
 
-def replace_entities(text):
-    text = URL_RE.sub(" URLTOKEN ", text)
-    text = EMAIL_RE.sub(" EMAILTOKEN ", text)
-    text = PHONE_RE.sub(" PHONETOKEN ", text)
-    text = MENTION_RE.sub(" MENTIONTOKEN ", text)
-    text = HASHTAG_RE.sub(r" HASHTAGTOKEN \1", text)
-    return text
-
-
-def replace_generic_english(text):
-    def _sub(match):
-        word = match.group(0)
-        if word.upper() in KNOWN_TOKENS:
-            return word
-        return " ENGWORDTOKEN "
-    text = GENERIC_ENGLISH_RE.sub(_sub, text)
-    text = MULTI_ENGWORD_RE.sub(" ENGWORDTOKEN", text)
-    return text
-
-
-def reduce_repeats(text):
-    had_repeat = bool(REPEAT_RE.search(text))
-    text = REPEAT_RE.sub(r"\1\1", text)
-    if had_repeat:
-        text = text + " REPEATEDCHARTOKEN"
-    return text
-
-
-def strip_punctuation(text):
-    return re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
-
-
-def strip_emojis(text):
-    return EMOJI_RE.sub(" ", text)
-
-
-def clean_text(text, remove_punct=True, remove_emoji=True, entities="replace",
-                fix_repeats=True):
+def clean_text(text, **kwargs):
     text = str(text)
     text = normalize_persian(text)
     text = desensor_text(text)
-    if entities == "replace":
-        text = replace_entities(text)
-        text = replace_generic_english(text)
-    if fix_repeats:
-        text = reduce_repeats(text)
-    if remove_emoji:
-        text = strip_emojis(text)
-    if remove_punct:
-        text = strip_punctuation(text)
+    
+    # جایگزینی entity‌ها
+    text = re.sub(r"(https?://\S+|www\.\S+)", " URLTOKEN ", text)
+    text = re.sub(r"[\w.\-]+@[\w\-]+\.[a-zA-Z]{2,}", " EMAILTOKEN ", text)
+    text = re.sub(r"(?:\+?\d{1,3}[\s\-]?)?(?:09\d{9}|0\d{9,10})", " PHONETOKEN ", text)
+    text = re.sub(r"@\w+", " MENTIONTOKEN ", text)
+    text = re.sub(r"#(\w+)", r" HASHTAGTOKEN \1", text)
+    
+    # کلمات انگلیسی
+    text = re.sub(r"[A-Za-z]{2,}", " ENGWORDTOKEN ", text)
+    
+    # تکرار حروف
+    had_repeat = bool(re.search(r"(.)\1{2,}", text))
+    text = re.sub(r"(.)\1{2,}", r"\1\1", text)
+    if had_repeat:
+        text += " REPEATEDCHARTOKEN"
+    
+    # حذف ایموجی
+    text = re.sub(r"[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF]", " ", text)
+    
+    # حذف نقطه‌گذاری
+    text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
     text = re.sub(r"\s+", " ", text).strip()
+    
     return text
 
 
-CLEAN_KWARGS = dict(remove_punct=True, remove_emoji=True, entities="replace",
-                     fix_repeats=True)
+CLEAN_KWARGS = {}
+
 
 # ----------------------------------------------------------------
-# ویژگی‌های مهندسی‌شده بیشتر
+# ویژگی‌های مهندسی‌شده پیشرفته
 # ----------------------------------------------------------------
-ENGLISH_RE = re.compile(r"[a-zA-Z]")
-UPPER_EN_RE = re.compile(r"[A-Z]")
-PERSIAN_CHAR_RE = re.compile(r"[\u0600-\u06FF]")
-DIGIT_RE = re.compile(r"\d")
-SPECIAL_CHAR_RE = re.compile(r"[!@#$%^&*()_+=\[\]{};':\"\\|,.<>/?]")
-LINK_RE = re.compile(r"(http|www|\.com|\.ir|\.org|\.net)", re.IGNORECASE)
-MONEY_RE = re.compile(r"(تومان|ریال|قیمت|خرید|فروش|تخفیف|ارزان|رایگان)", re.IGNORECASE)
-ACTION_RE = re.compile(r"(کلیک|کنید|بزنید|برید|بیاید|عضو|فالو|لایک|سابسکرایب)", re.IGNORECASE)
-
-
 def extract_engineered_features(raw_text):
     text = str(raw_text)
     n_chars = max(len(text), 1)
@@ -151,53 +119,63 @@ def extract_engineered_features(raw_text):
     n_words = len(words)
     avg_word_len = np.mean([len(w) for w in words]) if words else 0
 
-    n_urls = len(URL_RE.findall(text))
-    n_emails = len(EMAIL_RE.findall(text))
-    n_digits = len(DIGIT_RE.findall(text)) + len(re.findall(r"[۰-۹٠-٩]", text))
+    # شمارش‌ها
+    n_urls = len(re.findall(r"(https?://\S+|www\.\S+)", text))
+    n_emails = len(re.findall(r"[\w.\-]+@[\w\-]+\.[a-zA-Z]{2,}", text))
+    n_phones = len(re.findall(r"(?:09\d{9}|0\d{9,10})", text))
+    n_digits = len(re.findall(r"\d", text)) + len(re.findall(r"[۰-۹٠-٩]", text))
     n_excl = text.count("!") + text.count("؟!")
     n_quest = text.count("?") + text.count("؟")
-    n_emoji = len(EMOJI_RE.findall(text))
-    n_hashtags = len(HASHTAG_RE.findall(text))
-    n_mentions = len(MENTION_RE.findall(text))
-    n_upper_en = len(UPPER_EN_RE.findall(text))
-    n_en_chars = len(ENGLISH_RE.findall(text))
-    n_fa_chars = len(PERSIAN_CHAR_RE.findall(text))
-    n_repeats = len(REPEAT_RE.findall(text))
-    n_special = len(SPECIAL_CHAR_RE.findall(text))
-    n_links = len(LINK_RE.findall(text))
-    n_money = len(MONEY_RE.findall(text))
-    n_action = len(ACTION_RE.findall(text))
+    n_hashtags = len(re.findall(r"#\w+", text))
+    n_mentions = len(re.findall(r"@\w+", text))
+    n_en_chars = len(re.findall(r"[a-zA-Z]", text))
+    n_fa_chars = len(re.findall(r"[\u0600-\u06FF]", text))
+    n_repeats = len(re.findall(r"(.)\1{2,}", text))
+    n_special = len(re.findall(r"[!@#$%^&*()_+=\[\]{};':\"\\|,.<>/?]", text))
+
+    # کلمات کلیدی اسپم
+    text_lower = text.lower()
+    spam_kw_count = sum(1 for kw in SPAM_KEYWORDS if kw in text_lower)
+    normal_kw_count = sum(1 for kw in NORMAL_KEYWORDS if kw in text_lower)
 
     # نسبت‌ها
     digit_ratio = n_digits / n_chars
     en_ratio = n_en_chars / n_chars
     fa_ratio = n_fa_chars / n_chars
     special_ratio = n_special / n_chars
-    upper_ratio = n_upper_en / max(n_en_chars, 1)
+
+    # ویژگی‌های ترکیبی
+    has_link = 1 if (n_urls > 0 or 'لینک' in text_lower or 'link' in text_lower) else 0
+    has_phone = 1 if n_phones > 0 else 0
+    has_money = 1 if any(w in text_lower for w in ['تومان', 'ریال', 'قیمت', 'خرید', 'فروش']) else 0
+    has_action = 1 if any(w in text_lower for w in ['کلیک', 'کنید', 'بزنید', 'برید', 'فالو', 'لایک']) else 0
+    has_spam_kw = 1 if spam_kw_count >= 2 else 0
 
     return [
-        len(text),              # طول متن
-        n_words,                # تعداد کلمات
-        avg_word_len,           # میانگین طول کلمات
-        n_digits,               # تعداد ارقام
-        digit_ratio,            # نسبت ارقام
-        n_urls,                 # تعداد URL
-        n_emails,               # تعداد ایمیل
-        n_links,                # تعداد لینک‌ها
-        n_excl,                 # تعداد !
-        n_quest,                # تعداد ؟
-        n_emoji,                # تعداد ایموجی
-        n_hashtags,             # تعداد هشتگ
-        n_mentions,             # تعداد منشن
-        n_upper_en,             # حروف بزرگ انگلیسی
-        en_ratio,               # نسبت انگلیسی
-        fa_ratio,               # نسبت فارسی
-        special_ratio,          # نسبت کاراکتر خاص
-        upper_ratio,            # نسبت حروف بزرگ
-        n_repeats,              # تکرار حروف
-        n_money,                # کلمات مالی
-        n_action,               # کلمات اکشن
-        n_special,              # کاراکترهای خاص
+        len(text),
+        n_words,
+        avg_word_len,
+        n_digits,
+        digit_ratio,
+        n_urls,
+        n_emails,
+        n_phones,
+        n_excl,
+        n_quest,
+        n_hashtags,
+        n_mentions,
+        en_ratio,
+        fa_ratio,
+        special_ratio,
+        n_repeats,
+        n_special,
+        spam_kw_count,
+        normal_kw_count,
+        has_link,
+        has_phone,
+        has_money,
+        has_action,
+        has_spam_kw,
     ]
 
 
@@ -223,30 +201,30 @@ class CleanTextTransformer(BaseEstimator, TransformerMixin):
 
 
 # ----------------------------------------------------------------
-# Vectorizer بهینه‌شده
+# Vectorizer قوی‌تر
 # ----------------------------------------------------------------
 def build_vectorizer():
     return FeatureUnion([
         ("word", TfidfVectorizer(
-            ngram_range=(1, 2),
+            ngram_range=(1, 3),      # تری‌گرام هم اضافه شد
             min_df=MIN_DF,
             max_df=MAX_DF,
             sublinear_tf=True,
             max_features=MAX_TFIDF_FEATURES,
             strip_accents='unicode',
+            analyzer='word',
         )),
         ("char_wb", TfidfVectorizer(
             analyzer="char_wb",
-            ngram_range=(3, 5),
+            ngram_range=(2, 5),      # بایگرام کاراکتری
             min_df=MIN_DF,
             sublinear_tf=True,
-            max_features=5000,  # کاهش برای جلوگیری از اورفیت
+            max_features=8000,
         )),
     ])
 
 
 def build_pipeline(classifier):
-    """ساخت pipeline کامل"""
     text_branch = Pipeline([
         ("clean", CleanTextTransformer(**CLEAN_KWARGS)),
         ("tfidf", build_vectorizer()),
@@ -255,7 +233,7 @@ def build_pipeline(classifier):
         ("tfidf_branch", text_branch, "text"),
         ("engineered", Pipeline([
             ("extract", EngineeredFeatures()),
-            ("scale", MaxAbsScaler()),  # بهتر از StandardScaler برای داده‌های پراکنده
+            ("scale", MaxAbsScaler()),
         ]), "text"),
     ])
     return Pipeline([("features", features), ("clf", classifier)])
@@ -266,45 +244,56 @@ def as_model_input(messages):
 
 
 # ----------------------------------------------------------------
-# مدل بهینه‌شده با ضد اورفیت
+# مدل‌های بهینه
 # ----------------------------------------------------------------
-MODEL_NAME = "Logistic Regression (Optimized)"
-MODEL_FILENAME = "logistic_regression.joblib"
+MODEL_NAME = "Ensemble (LR + SVM + RF)"
+MODEL_FILENAME = "ensemble_model.joblib"
+
+
+def get_lr():
+    return LogisticRegression(
+        max_iter=2000, C=0.3, penalty="l2", solver="liblinear",
+        class_weight='balanced', random_state=RANDOM_STATE,
+    )
+
+
+def get_svm():
+    base = LinearSVC(
+        max_iter=2000, C=0.5, class_weight='balanced', random_state=RANDOM_STATE,
+    )
+    return CalibratedClassifierCV(base, cv=3)
+
+
+def get_rf():
+    return RandomForestClassifier(
+        n_estimators=200, max_depth=15, min_samples_leaf=2,
+        class_weight='balanced', random_state=RANDOM_STATE, n_jobs=-1,
+    )
 
 
 def get_classifier():
     """
-    Logistic Regression با تنظیمات ضد اورفیت:
-    - C=0.5: regularization قوی‌تر (کمتر از 1.0)
-    - penalty='l2': regularization L2
-    - solver='liblinear': مناسب برای داده‌های کوچک/متوسط
-    - class_weight='balanced': مدیریت عدم تعادل کلاس‌ها
+    Ensemble از 3 مدل مختلف برای دقت بالا
     """
-    return LogisticRegression(
-        max_iter=2000,
-        C=0.5,              # regularization قوی‌تر
-        penalty="l2",
-        solver="liblinear",
-        class_weight='balanced',  # مدیریت عدم تعادل
-        random_state=RANDOM_STATE,
+    return VotingClassifier(
+        estimators=[
+            ('lr', get_lr()),
+            ('svm', get_svm()),
+            ('rf', get_rf()),
+        ],
+        voting='soft',  # استفاده از احتمالات
+        weights=[2, 2, 1],  # وزن بیشتر به LR و SVM
     )
 
 
-def get_calibrated_classifier():
-    """
-    مدل کالیبره‌شده برای احتمالات دقیق‌تر
-    """
-    base_clf = get_classifier()
-    return CalibratedClassifierCV(base_clf, cv=3, method='sigmoid')
+def get_single_classifier():
+    """مدل تکی برای cross-validation سریع‌تر"""
+    return get_lr()
 
 
 def evaluate_with_cv(X, y, cv=5):
-    """
-    ارزیابی مدل با cross-validation برای بررسی اورفیت
-    """
-    clf = get_classifier()
+    clf = get_single_classifier()
     pipe = build_pipeline(clf)
-    
     skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=RANDOM_STATE)
     
     scores = {
@@ -316,3 +305,25 @@ def evaluate_with_cv(X, y, cv=5):
     }
     
     return {k: (v.mean(), v.std()) for k, v in scores.items()}
+
+
+def find_optimal_threshold(pipe, X_val, y_val):
+    """
+    پیدا کردن بهترین آستانه تصمیم‌گیری برای کمینه کردن خطاها
+    """
+    proba = pipe.predict_proba(X_val)[:, 1]
+    
+    best_threshold = 0.5
+    best_errors = float('inf')
+    
+    for threshold in np.arange(0.3, 0.7, 0.01):
+        pred = (proba >= threshold).astype(int)
+        fp = ((pred == 1) & (y_val == 0)).sum()
+        fn = ((pred == 0) & (y_val == 1)).sum()
+        total_errors = fp + fn
+        
+        if total_errors < best_errors:
+            best_errors = total_errors
+            best_threshold = threshold
+    
+    return best_threshold

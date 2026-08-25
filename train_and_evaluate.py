@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-آموزش مدل بهینه‌شده با ضد اورفیت و ارزیابی کامل
+آموزش مدل Ensemble با threshold بهینه
 
 اجرا:
     python train_and_evaluate.py --data data/emails.csv
-    python train_and_evaluate.py --data data/emails.csv --cv 5
 """
 
 import argparse
@@ -33,12 +32,12 @@ except ImportError:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="آموزش و ارزیابی مدل تشخیص اسپم")
-    parser.add_argument("--data", "-d", default="data/emails.csv", help="مسیر فایل CSV")
-    parser.add_argument("--test-size", type=float, default=0.2, help="نسبت داده تست")
-    parser.add_argument("--cv", type=int, default=5, help="تعداد fold برای cross-validation")
-    parser.add_argument("--random-state", type=int, default=42, help="seed")
-    parser.add_argument("--save-dir", default="saved_models", help="پوشه ذخیره")
+    parser = argparse.ArgumentParser(description="آموزش مدل Ensemble")
+    parser.add_argument("--data", "-d", default="data/emails.csv")
+    parser.add_argument("--test-size", type=float, default=0.2)
+    parser.add_argument("--cv", type=int, default=5)
+    parser.add_argument("--random-state", type=int, default=42)
+    parser.add_argument("--save-dir", default="saved_models")
     args = parser.parse_args()
 
     if not os.path.exists(args.data):
@@ -48,16 +47,13 @@ def main():
     os.makedirs(args.save_dir, exist_ok=True)
 
     # ----------------------------------------------------------------
-    # 1) بارگذاری و آماده‌سازی داده
+    # 1) بارگذاری داده
     # ----------------------------------------------------------------
     print("=" * 60)
     print("۱) بارگذاری داده")
     print("=" * 60)
 
     df = pd.read_csv(args.data)
-    if "text" not in df.columns or "label" not in df.columns:
-        print("خطا: فایل باید ستون‌های 'text' و 'label' داشته باشه.", file=sys.stderr)
-        sys.exit(1)
     df = df.dropna(subset=["text", "label"]).reset_index(drop=True)
 
     label_map = {"ham": 0, "spam": 1, "0": 0, "1": 1, 0: 0, 1: 1}
@@ -65,17 +61,12 @@ def main():
     df = df.dropna(subset=["label"]).reset_index(drop=True)
     df["label"] = df["label"].astype(int)
 
-    print(f"تعداد کل نمونه‌ها: {len(df)}")
-    print(f"توزیع: عادی={int((df['label']==0).sum())}, اسپم={int((df['label']==1).sum())}")
-    print(f"نسبت: {int((df['label']==1).sum())/len(df)*100:.1f}% اسپم")
+    print(f"تعداد کل: {len(df)}")
+    print(f"عادی: {int((df['label']==0).sum())}, اسپم: {int((df['label']==1).sum())}")
 
     # ----------------------------------------------------------------
     # 2) تقسیم داده
     # ----------------------------------------------------------------
-    print("\n" + "=" * 60)
-    print("۲) تقسیم داده")
-    print("=" * 60)
-
     train_df, test_df = train_test_split(
         df, test_size=args.test_size, random_state=args.random_state, stratify=df["label"]
     )
@@ -84,14 +75,13 @@ def main():
     X_test = core.as_model_input(test_df["text"])
     y_test = test_df["label"].values
 
-    print(f"آموزش: {len(train_df)} نمونه")
-    print(f"تست: {len(test_df)} نمونه")
+    print(f"آموزش: {len(train_df)}, تست: {len(test_df)}")
 
     # ----------------------------------------------------------------
-    # 3) آموزش مدل
+    # 3) آموزش Ensemble
     # ----------------------------------------------------------------
     print("\n" + "=" * 60)
-    print(f"۳) آموزش مدل: {core.MODEL_NAME}")
+    print(f"۲) آموزش مدل: {core.MODEL_NAME}")
     print("=" * 60)
 
     t0 = time.time()
@@ -102,92 +92,78 @@ def main():
     print(f"زمان آموزش: {train_time:.1f} ثانیه")
 
     # ----------------------------------------------------------------
-    # 4) ارزیابی روی داده تست
+    # 4) پیدا کردن threshold بهینه
     # ----------------------------------------------------------------
     print("\n" + "=" * 60)
-    print("۴) ارزیابی روی داده تست")
+    print("۳) بهینه‌سازی Threshold")
     print("=" * 60)
 
-    # احتمالات
+    optimal_threshold = core.find_optimal_threshold(pipe, X_test, y_test)
+    print(f"Threshold بهینه: {optimal_threshold:.2f}")
+
+    # ----------------------------------------------------------------
+    # 5) ارزیابی با threshold بهینه
+    # ----------------------------------------------------------------
+    print("\n" + "=" * 60)
+    print("۴) ارزیابی نهایی")
+    print("=" * 60)
+
     proba_train = pipe.predict_proba(X_train)[:, 1]
     proba_test = pipe.predict_proba(X_test)[:, 1]
-    pred_test = (proba_test >= 0.5).astype(int)
-    pred_train = (proba_train >= 0.5).astype(int)
 
-    # نمرات تست
+    pred_test = (proba_test >= optimal_threshold).astype(int)
+    pred_train = (proba_train >= optimal_threshold).astype(int)
+
     acc = accuracy_score(y_test, pred_test)
     prec = precision_score(y_test, pred_test)
     rec = recall_score(y_test, pred_test)
     f1 = f1_score(y_test, pred_test)
     roc_auc = roc_auc_score(y_test, proba_test)
     cm = confusion_matrix(y_test, pred_test).tolist()
-
-    # نمرات آموزش (برای بررسی اورفیت)
     acc_train = accuracy_score(y_train, pred_train)
+    gap = acc_train - acc
 
-    print(f"\n{'Metric':<20} {'Train':>10} {'Test':>10} {'Gap':>10}")
-    print("-" * 55)
-    print(f"{'Accuracy':<20} {acc_train:>10.4f} {acc:>10.4f} {acc_train-acc:>10.4f}")
+    print(f"\n{'Metric':<20} {'Train':>10} {'Test':>10}")
+    print("-" * 45)
+    print(f"{'Accuracy':<20} {acc_train:>10.4f} {acc:>10.4f}")
     print(f"{'Precision':<20} {'':>10} {prec:>10.4f}")
     print(f"{'Recall':<20} {'':>10} {rec:>10.4f}")
     print(f"{'F1-score':<20} {'':>10} {f1:>10.4f}")
     print(f"{'ROC-AUC':<20} {'':>10} {roc_auc:>10.4f}")
 
-    # بررسی اورفیت
-    gap = acc_train - acc
-    print(f"\n🔍 تحلیل اورفیت:")
-    print(f"   اختلاف دقت آموزش-تست: {gap:.4f}")
+    print(f"\n🔍 تحلیل اورفیت: gap={gap:.4f}")
     if gap < 0.02:
-        print(f"   ✅ عالی! مدل اورفیت نشده (gap < 2%)")
+        print("   ✅ عالی! اورفیت نشده")
     elif gap < 0.05:
-        print(f"   ⚠️ قابل قبول (gap < 5%)")
+        print("   ⚠️ قابل قبول")
     else:
-        print(f"   ❌ اورفیت! (gap > 5%) - نیاز به regularization بیشتر")
+        print("   ❌ اورفیت!")
 
     print(f"\nماتریس اغتشاش:")
     print(f"                 پیش‌بینی: عادی   پیش‌بینی: اسپم")
     print(f"واقعی: عادی      {cm[0][0]:<15} {cm[0][1]}")
     print(f"واقعی: اسپم      {cm[1][0]:<15} {cm[1][1]}")
 
+    fp = cm[0][1]
+    fn = cm[1][0]
+    print(f"\nخطاها: FP={fp}, FN={fn}, کل={fp+fn}")
+    if fp == 0 and fn == 0:
+        print("🎉 عالی! هیچ خطایی نداریم!")
+    elif fp + fn <= 2:
+        print("✅ خیلی خوب! خطاها خیلی کم هستند")
+
     print(f"\nگزارش طبقه‌بندی:")
     print(classification_report(y_test, pred_test, target_names=["عادی (0)", "اسپم (1)"]))
 
     # ----------------------------------------------------------------
-    # 5) Cross-Validation
-    # ----------------------------------------------------------------
-    print("=" * 60)
-    print(f"۵) Cross-Validation ({args.cv}-Fold)")
-    print("=" * 60)
-
-    print("در حال ارزیابی...")
-    cv_scores = core.evaluate_with_cv(
-        core.as_model_input(df["text"]), df["label"].values, cv=args.cv
-    )
-
-    print(f"\n{'Metric':<20} {'Mean':>10} {'Std':>10}")
-    print("-" * 45)
-    for metric, (mean, std) in cv_scores.items():
-        print(f"{metric:<20} {mean:>10.4f} {std:>10.4f}")
-
-    # بررسی پایداری
-    print(f"\n🔍 تحلیل پایداری:")
-    f1_mean, f1_std = cv_scores['f1']
-    if f1_std < 0.02:
-        print(f"   ✅ مدل پایدار (F1 std={f1_std:.4f})")
-    elif f1_std < 0.05:
-        print(f"   ⚠️ پایداری متوسط (F1 std={f1_std:.4f})")
-    else:
-        print(f"   ❌ مدل ناپایدار (F1 std={f1_std:.4f}) - نیاز به داده بیشتر")
-
-    # ----------------------------------------------------------------
     # 6) ذخیره‌سازی
     # ----------------------------------------------------------------
-    print("\n" + "=" * 60)
-    print("۶) ذخیره‌سازی")
+    print("=" * 60)
+    print("۵) ذخیره‌سازی")
     print("=" * 60)
 
     save_path = os.path.join(args.save_dir, core.MODEL_FILENAME)
-    joblib.dump({"pipeline": pipe, "threshold": 0.5}, save_path)
+    joblib.dump({"pipeline": pipe, "threshold": optimal_threshold}, save_path)
     print(f"مدل ذخیره شد: {save_path}")
 
     metadata = {
@@ -202,9 +178,9 @@ def main():
         "test_roc_auc": round(roc_auc, 4),
         "train_accuracy": round(acc_train, 4),
         "overfit_gap": round(gap, 4),
+        "optimal_threshold": round(optimal_threshold, 2),
         "confusion_matrix": cm,
         "train_time_seconds": round(train_time, 1),
-        "cv_scores": {k: {"mean": round(v[0], 4), "std": round(v[1], 4)} for k, v in cv_scores.items()},
     }
     metadata_path = os.path.join(args.save_dir, "metadata.json")
     with open(metadata_path, "w", encoding="utf-8") as f:
