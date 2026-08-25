@@ -102,6 +102,12 @@ def train_model(request):
         save_path = os.path.join(settings.BASE_DIR, 'saved_models', core.MODEL_FILENAME)
         joblib.dump({"pipeline": pipe, "threshold": 0.5}, save_path)
 
+        # محاسبه نمرات آموزش (برای بررسی اورفیت)
+        proba_train = pipe.predict_proba(X_train)[:, 1]
+        pred_train = (proba_train >= 0.5).astype(int)
+        acc_train = accuracy_score(y_train, pred_train)
+        gap = acc_train - acc
+
         metadata = {
             "display_name": core.MODEL_NAME,
             "n_samples_total": len(df),
@@ -112,6 +118,8 @@ def train_model(request):
             "test_recall": round(rec, 4),
             "test_f1": round(f1, 4),
             "test_roc_auc": round(roc_auc, 4),
+            "train_accuracy": round(acc_train, 4),
+            "overfit_gap": round(gap, 4),
             "confusion_matrix": cm,
             "train_time_seconds": round(train_time, 1),
         }
