@@ -62,7 +62,14 @@ def predict_text(text):
     if not os.path.exists(MODEL_PATH):
         return {'error': 'مدل هنوز آموزش داده نشده است', 'label': None, 'confidence': 0}
 
-    saved = joblib.load(MODEL_PATH)
+    try:
+        saved = joblib.load(MODEL_PATH)
+    except Exception:
+        return {
+            'error': 'مدل ذخیره‌شده با نسخه فعلی اسکیت‌لرن سازگار نیست. '
+                     'لطفاً یک‌بار از صفحه «آموزش مدل» آموزش دهید تا مدل بازتولید شود.',
+            'label': None, 'confidence': 0,
+        }
     proba = saved['pipeline'].predict_proba(core.as_model_input([text]))[0, 1]
     threshold = float(saved.get('threshold', 0.5))
 
@@ -366,7 +373,13 @@ def test_file(request):
             df = df.head(2000).reset_index(drop=True)
 
             texts = [str(t) for t in df[text_col] if str(t) and str(t) != 'nan']
-            saved = joblib.load(MODEL_PATH)
+            try:
+                saved = joblib.load(MODEL_PATH)
+            except FileNotFoundError:
+                raise ValueError('مدل هنوز آموزش داده نشده است. ابتدا از صفحه «آموزش مدل» استفاده کنید.')
+            except Exception:
+                raise ValueError('مدل ذخیره‌شده با نسخه فعلی اسکیت‌لرن سازگار نیست. '
+                                 'لطفاً یک‌بار از صفحه «آموزش مدل» آموزش دهید تا مدل بازتولید شود.')
             probas = saved['pipeline'].predict_proba(core.as_model_input(texts))[:, 1]
             threshold = float(saved.get('threshold', 0.5))
 
