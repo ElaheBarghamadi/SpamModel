@@ -8,6 +8,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.home, name='home'),
     path('train/', views.train_model, name='train'),
+    path('train/start/', views.train_start, name='train_start'),
+    path('train/status/', views.train_status, name='train_status'),
     path('test/', views.test_text, name='test_text'),
     path('test-file/', views.test_file, name='test_file'),
     path('api/predict/', views.api_predict, name='api_predict'),

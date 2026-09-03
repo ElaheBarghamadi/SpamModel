@@ -20,6 +20,6 @@
       98
     ]
   ],
-  "train_time_seconds": 5.4,
+  "train_time_seconds": 31.2,
   "display_name": "Ensemble v2 (LR + SVM + NB)"
 }

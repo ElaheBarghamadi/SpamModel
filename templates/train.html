@@ -3,10 +3,60 @@
 {% block title %}آموزش مدل — تشخیص اسپم{% endblock %}
 
 {% block content %}
+<style>
+    /* استایل اختصاصی صفحه آموزش زنده */
+    .stepper { display: flex; flex-direction: column; gap: 4px; }
+    .step {
+        display: flex; align-items: center; gap: 12px; padding: 9px 14px;
+        border-radius: 12px; font-size: .9rem; color: var(--text-2); transition: all .25s;
+    }
+    .step .dot {
+        width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%;
+        display: grid; place-items: center; font-size: .8rem; font-weight: 800;
+        background: var(--border); color: var(--text-2); transition: all .25s;
+    }
+    .step .dot svg { width: 15px; height: 15px; display: none; }
+    .step.active { background: var(--primary-light); color: var(--primary-dark); font-weight: 700; }
+    .step.active .dot { background: var(--primary); color: #fff; box-shadow: 0 0 0 5px rgba(99,102,241,.18); }
+    .step.active .dot span { display: none; }
+    .step.active .dot svg.spin { display: block; animation: spin 1s linear infinite; }
+    .step.done { color: var(--text); }
+    .step.done .dot { background: var(--success); color: #fff; }
+    .step.done .dot span { display: none; }
+    .step.done .dot svg.check { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .terminal {
+        background: #0F172A; color: #CBD5E1; border-radius: 12px;
+        font-family: 'Vazirmatn', Consolas, monospace; font-size: .82rem; line-height: 2;
+        padding: 16px 18px; height: 320px; overflow-y: auto; direction: rtl;
+    }
+    .terminal .t-head {
+        display: flex; gap: 6px; margin-bottom: 10px; direction: ltr; justify-content: flex-end;
+    }
+    .terminal .t-head i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+    .log-line { display: flex; gap: 10px; animation: fadein .25s; }
+    .log-line .lt { color: #64748B; flex-shrink: 0; font-size: .75rem; direction: ltr; padding-top: 2px; }
+    .log-line.stage { color: #A5B4FC; font-weight: 700; }
+    .log-line.ok { color: #6EE7B7; }
+    .log-line.err { color: #FCA5A5; }
+    @keyframes fadein { from { opacity: 0; transform: translateY(3px); } }
+
+    .elapsed-badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: var(--primary-light); color: var(--primary-dark);
+        padding: 4px 14px; border-radius: 99px; font-size: .82rem; font-weight: 700;
+    }
+    .elapsed-badge svg { width: 14px; height: 14px; }
+</style>
+
 <h1 class="page-title"><svg><use href="#i-bot"/></svg> آموزش مدل</h1>
 
 {% if error %}
 <div class="alert alert-error"><svg><use href="#i-alert"/></svg>{{ error }}</div>
+{% endif %}
+{% if train_error %}
+<div class="alert alert-error"><svg><use href="#i-alert"/></svg>آموزش قبلی با خطا مواجه شد: {{ train_error }}</div>
 {% endif %}
 
 {% if success %}
@@ -28,7 +78,7 @@
                 <tr><th>نمونه‌های آموزش</th><td>{{ raw.n_train }}</td></tr>
                 <tr><th>نمونه‌های تست</th><td>{{ raw.n_test }}</td></tr>
                 <tr><th>آستانه بهینه (از OOF آموزش)</th><td>{{ threshold }}</td></tr>
-                <tr><th>زمان آموزش</th><td>{{ train_time }} ثانیه</td></tr>
+                <tr><th>زمان کل آموزش</th><td>{{ train_time }} ثانیه</td></tr>
                 <tr><th>فاصله اورفیت (Train − Test)</th><td>{{ overfit_gap }}%</td></tr>
                 <tr><th>دقت روی آموزش</th><td>{{ raw.train_accuracy }}</td></tr>
             </table>
@@ -74,21 +124,153 @@
 </div>
 {% endif %}
 
-<div class="card">
-    <div class="card-header"><svg><use href="#i-spark"/></svg> آموزش آنسامبل نسخه ۲ (LR + SVM + NB)</div>
-    <div class="card-body">
-        <p class="muted" style="margin-bottom:16px">
-            مدل روی دیتاست <code>data/emails.csv</code> آموزش می‌بیند. آستانه تصمیم به‌صورت خودکار و بدون نشت به داده تست
-            (با احتمالات out-of-fold روی داده آموزش) انتخاب می‌شود. این عملیات حدود ۳۰ تا ۶۰ ثانیه طول می‌کشد.
-        </p>
-        <form method="post" style="display:flex; gap:14px; align-items:end; flex-wrap:wrap">
-            {% csrf_token %}
-            <div style="flex:1; min-width:200px">
-                <label for="test_size">سهم داده تست (۰.۱ تا ۰.۵)</label>
-                <input type="number" name="test_size" id="test_size" value="0.2" min="0.1" max="0.5" step="0.05">
+<div class="grid-2">
+    <!-- فرم شروع آموزش -->
+    <div class="card">
+        <div class="card-header"><svg><use href="#i-spark"/></svg> آموزش آنسامبل نسخه ۲ (LR + SVM + NB)</div>
+        <div class="card-body">
+            <p class="muted" style="margin-bottom:16px">
+                مدل روی دیتاست <code>data/emails.csv</code> آموزش می‌بیند. آستانه تصمیم بدون نشت به داده تست
+                (با احتمالات OOF) انتخاب می‌شود. مراحل و لاگ‌ها به‌صورت زنده همین‌جا نمایش داده می‌شوند.
+            </p>
+            <div style="display:flex; gap:14px; align-items:end; flex-wrap:wrap">
+                <div style="flex:1; min-width:180px">
+                    <label for="test_size">سهم داده تست (۰.۱ تا ۰.۵)</label>
+                    <input type="number" name="test_size" id="test_size" value="0.2" min="0.1" max="0.5" step="0.05">
+                </div>
+                <button type="button" id="start-btn" class="btn btn-primary" onclick="startTrain()">
+                    <svg><use href="#i-bot"/></svg>شروع آموزش
+                </button>
             </div>
-            <button type="submit" class="btn btn-primary"><svg><use href="#i-bot"/></svg>شروع آموزش</button>
-        </form>
+        </div>
+    </div>
+
+    <!-- مراحل -->
+    <div class="card">
+        <div class="card-header">
+            <svg><use href="#i-gauge"/></svg> مراحل آموزش
+            <span style="margin-inline-start:auto" id="elapsed-wrap" hidden>
+                <span class="elapsed-badge"><svg><use href="#i-clock"/></svg><span id="elapsed">۰ ثانیه</span></span>
+            </span>
+        </div>
+        <div class="card-body">
+            <div class="stepper" id="stepper">
+                {% for s in stages %}
+                <div class="step" id="step-{{ forloop.counter0 }}">
+                    <span class="dot">
+                        <span>{{ forloop.counter }}</span>
+                        <svg class="check"><use href="#i-check"/></svg>
+                        <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.56"/></svg>
+                    </span>
+                    {{ s }}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
     </div>
 </div>
+
+<!-- ترمینال لاگ زنده -->
+<div class="card" id="log-card" hidden>
+    <div class="card-header"><svg><use href="#i-chart"/></svg> لاگ زنده آموزش</div>
+    <div class="card-body" style="padding:14px">
+        <div class="terminal" id="terminal">
+            <div class="t-head"><i style="background:#EF4444"></i><i style="background:#F59E0B"></i><i style="background:#10B981"></i></div>
+            <div id="log-lines"></div>
+        </div>
+    </div>
+</div>
+
+<div id="live-error-slot"></div>
+
+<script>
+let pollTimer = null;
+let lastLogCount = 0;
+
+function setSteps(stage, status) {
+    const total = {{ stages|length }};
+    for (let i = 0; i < total; i++) {
+        const el = document.getElementById('step-' + i);
+        el.classList.remove('active', 'done');
+        if (status === 'done' || i < stage) el.classList.add('done');
+        else if (i === stage && status === 'running') el.classList.add('active');
+    }
+}
+
+function renderLogs(logs) {
+    const box = document.getElementById('log-lines');
+    if (logs.length === lastLogCount) return;
+    for (let i = lastLogCount; i < logs.length; i++) {
+        const l = logs[i];
+        const div = document.createElement('div');
+        let cls = 'log-line';
+        if (l.m.startsWith('──')) cls += ' stage';
+        else if (l.m.startsWith('✓') || l.m.startsWith('🎉')) cls += ' ok';
+        else if (l.m.startsWith('✗')) cls += ' err';
+        div.className = cls;
+        div.innerHTML = '<span class="lt">' + l.t + '</span><span></span>';
+        div.lastChild.textContent = l.m;
+        box.appendChild(div);
+    }
+    lastLogCount = logs.length;
+    const term = document.getElementById('terminal');
+    term.scrollTop = term.scrollHeight;
+}
+
+async function poll() {
+    try {
+        const r = await fetch('/train/status/');
+        const d = await r.json();
+        setSteps(d.stage, d.status);
+        renderLogs(d.logs);
+        document.getElementById('elapsed').textContent = d.elapsed + ' ثانیه';
+
+        if (d.status === 'done') {
+            clearTimeout(pollTimer);
+            setTimeout(() => window.location = '/train/?done=1', 700);
+            return;
+        }
+        if (d.status === 'error') {
+            clearTimeout(pollTimer);
+            document.getElementById('live-error-slot').innerHTML =
+                '<div class="alert alert-error"><svg><use href="#i-alert"/></svg>آموزش ناموفق بود: ' + (d.error || 'خطای ناشناخته') + '</div>';
+            document.getElementById('start-btn').disabled = false;
+            return;
+        }
+        pollTimer = setTimeout(poll, 600);
+    } catch (e) {
+        pollTimer = setTimeout(poll, 1500);
+    }
+}
+
+async function startTrain() {
+    const btn = document.getElementById('start-btn');
+    btn.disabled = true;
+    document.getElementById('log-lines').innerHTML = '';
+    lastLogCount = 0;
+    document.getElementById('log-card').hidden = false;
+    document.getElementById('elapsed-wrap').hidden = false;
+
+    const ts = document.getElementById('test_size').value || '0.2';
+    const r = await fetch('/train/start/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'test_size=' + encodeURIComponent(ts),
+    });
+    const d = await r.json();
+    if (d.started || d.already_running) poll();
+    else {
+        btn.disabled = false;
+        alert('خطا در شروع آموزش');
+    }
+}
+
+// اگر هنگام باز شدن صفحه، آموزشی در جریان بود، ادامه‌اش را زنده نشان بده
+{% if live_status == 'running' %}
+document.getElementById('log-card').hidden = false;
+document.getElementById('elapsed-wrap').hidden = false;
+document.getElementById('start-btn').disabled = true;
+poll();
+{% endif %}
+</script>
 {% endblock %}
