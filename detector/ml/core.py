@@ -428,19 +428,23 @@ def evaluate_with_cv(X, y, cv=5):
     return {k: (v.mean(), v.std()) for k, v in scores.items()}
 
 
-def find_optimal_threshold_from_proba(proba, y):
+def find_optimal_threshold_from_proba(proba, y, fp_cost=5.0, fn_cost=1.0):
     """
-    آستانه بهینه بر اساس بیشینه‌سازی F1.
+    آستانه بهینه با رویکرد محافظه‌کارانه:
+    اسپم‌کردنِ اشتباهی یک پیام عادی (FP) پنج برابر بدتر از رد شدن یک اسپم (FN) است.
     باید روی احتمالات out-of-fold داده «آموزش» صدا زده شود تا نشتی به تست نباشد.
+    بین آستانه‌های هم‌هزینه، آستانه بالاتر (امن‌تر) انتخاب می‌شود.
     """
     best_threshold = 0.5
-    best_f1 = -1.0
+    best_cost = float('inf')
 
-    for threshold in np.arange(0.25, 0.75, 0.01):
+    for threshold in np.arange(0.25, 0.86, 0.01):  # صعودی: در تساوی، آستانه بالاتر می‌ماند
         pred = (proba >= threshold).astype(int)
-        f1 = f1_score(y, pred, zero_division=0)
-        if f1 > best_f1:
-            best_f1 = f1
+        fp = int(((pred == 1) & (y == 0)).sum())
+        fn = int(((pred == 0) & (y == 1)).sum())
+        cost = fp_cost * fp + fn_cost * fn
+        if cost < best_cost:
+            best_cost = cost
             best_threshold = threshold
 
     return float(best_threshold)

@@ -195,7 +195,7 @@ def train_worker(test_size):
         t0 = time.time()
         proba_oof = cross_val_predict(pipe, X_train, y_train, cv=skf, method='predict_proba')[:, 1]
         threshold = core.find_optimal_threshold_from_proba(proba_oof, y_train)
-        _tlog(f'✓ آستانه بهینه پیدا شد: {threshold:.2f} ({time.time() - t0:.1f} ثانیه)')
+        _tlog(f'✓ آستانه بهینه (محافظه‌کارانه: اولویت با عادی‌ها) پیدا شد: {threshold:.2f} ({time.time() - t0:.1f} ثانیه)')
 
         _set_stage(4)
         proba_test = pipe.predict_proba(X_test)[:, 1]

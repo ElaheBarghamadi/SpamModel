@@ -3,23 +3,23 @@
   "n_samples_total": 8469,
   "n_train": 6775,
   "n_test": 1694,
-  "test_accuracy": 0.9616,
-  "test_precision": 0.9728,
-  "test_recall": 0.9598,
-  "test_f1": 0.9663,
+  "test_accuracy": 0.9445,
+  "test_precision": 0.9899,
+  "test_recall": 0.9124,
+  "test_f1": 0.9496,
   "test_roc_auc": 0.9906,
-  "train_accuracy": 0.9975,
-  "overfit_gap": 0.0359,
-  "optimal_threshold": 0.47,
+  "train_accuracy": 0.983,
+  "overfit_gap": 0.0385,
+  "optimal_threshold": 0.76,
   "confusion_matrix": [
     [
-      698,
-      26
+      715,
+      9
     ],
     [
-      39,
-      931
+      85,
+      885
     ]
   ],
-  "train_time_seconds": 9.2
+  "train_time_seconds": 8.0
 }
