@@ -73,6 +73,10 @@ def normalize_persian(text):
     text = re.compile(r"[\u0640ـ]+").sub("", text)
     text = text.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
     text = text.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789"))
+    # ضد فرار: حروفی که با فاصله از هم جدا شده‌اند را دوباره می‌چسباند
+    # مثال: «ب ر ن د ه شدید» ← «برنده شدید»
+    text = re.sub(r"(?<!\S)([\w](?: [\w]){2,6})(?!\S)",
+                  lambda m: m.group(1).replace(" ", ""), text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
@@ -149,6 +153,14 @@ def extract_engineered_features(raw_text):
     spam_kw_count = sum(1 for kw in SPAM_KEYWORDS if kw in text_lower)
     normal_kw_count = sum(1 for kw in NORMAL_KEYWORDS if kw in text_lower)
 
+    # الگوهای فیشینگ/فوریت (نسخه ۳)
+    n_cred_req = len(re.findall(
+        r"اطلاعات (کارت|حساب|خود)|رمز (پویا|ثانوی|شما)|کد ملی|تایید (اطلاعات|هویت)", text))
+    n_urgency_threat = len(re.findall(
+        r"مسدود|جریمه|بدهی|تعلیق|مهلت|فورا اقدام|آخرین (فرصت|مهلت)|ظرفیت محدود", text))
+    phishing_pattern = 1 if (n_cred_req > 0 or (n_urgency_threat > 0 and
+        re.search(r"(کلیک|لینک|تماس بگیرید|واریز|ارسال عدد|وارد نمایید)", text))) else 0
+
     # نسبت‌ها
     digit_ratio = n_digits / n_chars
     en_ratio = n_en_chars / n_chars
@@ -197,6 +209,9 @@ def extract_engineered_features(raw_text):
         has_fwd_header,
         has_gmail_header,
         log_len,
+        n_cred_req,
+        n_urgency_threat,
+        phishing_pattern,
     ]
 
 
