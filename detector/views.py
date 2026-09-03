@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ویوهای اپ تشخیص اسپم فارسی — نسخه تمیز
-همه‌چیز از هسته مشترک detector.ml.core استفاده می‌کند (آنسامبل نسخه ۲)
+همه‌چیز از هسته مشترک detector.ml.core استفاده می‌کند
 """
 import os
 import json
@@ -45,75 +45,20 @@ def load_metadata():
 
 
 def load_dataset():
-    df = pd.read_csv(DATASET_PATH)
-    df = df.dropna(subset=['text', 'label']).reset_index(drop=True)
-    df['label'] = df['label'].map({'ham': 0, 'spam': 1}).astype(int)
-    return df
-
-
-def train_ensemble(test_size=0.2, random_state=core.RANDOM_STATE, cv_splits=5):
-    """آموزش آنسامبل نسخه ۲ + انتخاب آستانه با OOF (بدون نشت به تست)"""
-    df = load_dataset()
-
-    train_df, test_df = train_test_split(
-        df, test_size=test_size, random_state=random_state, stratify=df['label']
-    )
-    X_train = core.as_model_input(train_df['text'])
-    y_train = train_df['label'].values
-    X_test = core.as_model_input(test_df['text'])
-    y_test = test_df['label'].values
-
-    t0 = time.time()
-    pipe = core.build_pipeline(core.get_classifier())
-    pipe.fit(X_train, y_train)
-    train_time = time.time() - t0
-
-    # آستانه بهینه فقط با داده آموزش (احتمالات out-of-fold)
-    skf = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=random_state)
-    proba_oof = cross_val_predict(pipe, X_train, y_train, cv=skf, method='predict_proba')[:, 1]
-    threshold = core.find_optimal_threshold_from_proba(proba_oof, y_train)
-
-    # ارزیابی
-    proba_test = pipe.predict_proba(X_test)[:, 1]
-    pred_test = (proba_test >= threshold).astype(int)
-    pred_train = (pipe.predict_proba(X_train)[:, 1] >= threshold).astype(int)
-
-    acc = accuracy_score(y_test, pred_test)
-    result = {
-        'pipeline': pipe,
-        'threshold': threshold,
-        'metrics': {
-            'n_samples_total': len(df),
-            'n_train': len(train_df),
-            'n_test': len(test_df),
-            'test_accuracy': round(acc, 4),
-            'test_precision': round(precision_score(y_test, pred_test), 4),
-            'test_recall': round(recall_score(y_test, pred_test), 4),
-            'test_f1': round(f1_score(y_test, pred_test), 4),
-            'test_roc_auc': round(roc_auc_score(y_test, proba_test), 4),
-            'train_accuracy': round(accuracy_score(y_train, pred_train), 4),
-            'overfit_gap': round(accuracy_score(y_train, pred_train) - acc, 4),
-            'optimal_threshold': round(float(threshold), 2),
-            'confusion_matrix': confusion_matrix(y_test, pred_test).tolist(),
-            'train_time_seconds': round(train_time, 1),
-        },
-        'report': classification_report(
-            y_test, pred_test, target_names=['عادی', 'اسپم'], output_dict=True, zero_division=0
-        ),
-    }
-    return result
+    """بارگذاری و ادغام همه دیتاست‌های پوشه data"""
+    return core.load_datasets(os.path.join(settings.BASE_DIR, 'data'))
 
 
 def save_model(pipe, threshold, metrics):
     os.makedirs(SAVED_DIR, exist_ok=True)
-    joblib.dump({'pipeline': pipe, 'threshold': float(threshold), 'version': 'v2'}, MODEL_PATH)
+    joblib.dump({'pipeline': pipe, 'threshold': float(threshold), 'version': 'v3'}, MODEL_PATH)
     metrics['display_name'] = core.MODEL_NAME
     with open(METADATA_PATH, 'w', encoding='utf-8') as f:
         json.dump(metrics, f, ensure_ascii=False, indent=2)
 
 
 def predict_text(text):
-    """پیش‌بینی برای یک متن با مدل آنسامبل"""
+    """پیش‌بینی برای یک متن با مدل آموزش‌دیده"""
     if not os.path.exists(MODEL_PATH):
         return {'error': 'مدل هنوز آموزش داده نشده است', 'label': None, 'confidence': 0}
 
@@ -182,7 +127,7 @@ def home(request):
 TRAIN_STAGES = [
     'بارگذاری و آماده‌سازی داده‌ها',
     'تقسیم داده به آموزش و تست',
-    'آموزش آنسامبل (LR + SVM + NB)',
+    'آموزش مدل (LinearSVC کالیبره)',
     'بهینه‌سازی آستانه (OOF)',
     'ارزیابی روی داده تست',
     'ذخیره مدل و متادیتا',
@@ -231,11 +176,11 @@ def train_worker(test_size):
         _tlog(f'✓ تقسیم انجام شد: آموزش {len(train_df)} | تست {len(test_df)} (سهم تست: {test_size})')
 
         _set_stage(2)
-        _tlog('→ اجزای آنسامبل: LogisticRegression، LinearSVC (کالیبره)، ComplementNB')
+        _tlog('→ مدل: LinearSVC کالیبره (C=1.0) با ویژگی‌های TF-IDF کلمه‌ای و کاراکتری')
         t0 = time.time()
         pipe = core.build_pipeline(core.get_classifier())
         pipe.fit(X_train, y_train)
-        _tlog(f'✓ آموزش آنسامبل تمام شد ({time.time() - t0:.1f} ثانیه)')
+        _tlog(f'✓ آموزش مدل تمام شد ({time.time() - t0:.1f} ثانیه)')
 
         _set_stage(3)
         _tlog('→ اجرای اعتبارسنجی متقاطع ۵ لایه روی داده آموزش (بدون نشت به تست)...')
@@ -354,8 +299,8 @@ def train_status(request):
 
 
 def train_model(request):
-    if not os.path.exists(DATASET_PATH):
-        return render(request, 'train.html', {'error': 'فایل دیتاست (data/emails.csv) یافت نشد!',
+    if not os.path.isdir(os.path.join(settings.BASE_DIR, 'data')):
+        return render(request, 'train.html', {'error': 'پوشه دیتاست (data/) یافت نشد!',
                                               'stages': TRAIN_STAGES})
 
     context = {'stages': TRAIN_STAGES}

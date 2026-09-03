@@ -11,6 +11,7 @@ Core ML code for Persian Spam Detection
   5. آستانه بر اساس بیشینه‌سازی F1 روی داده آموزش (نه تست)
 """
 
+import os
 import re
 import numpy as np
 import pandas as pd
@@ -264,9 +265,57 @@ def as_model_input(messages):
 
 
 # ----------------------------------------------------------------
+# بارگذاری یکپارچه همه دیتاست‌ها
+# ----------------------------------------------------------------
+LABEL_MAP = {
+    "ham": 0, "normal": 0, "not spam": 0, "0": 0, 0: 0, "عادی": 0,
+    "spam": 1, "1": 1, 1: 1, "اسپم": 1,
+}
+TEXT_COLUMNS = ["text", "message", "content", "comment", "متن", "پیام"]
+LABEL_COLUMNS = ["label", "labels", "class", "target", "برچسب", "دسته"]
+
+
+def load_datasets(data_dir="data"):
+    """
+    همه فایل‌های csv داخل پوشه داده را می‌خواند و یکپارچه می‌کند.
+    هر فایل باید ستون متن و ستون برچسب داشته باشد.
+    خروجی: دیتافریم با ستون‌های text, label(0/1), source
+    """
+    import glob
+    frames = []
+    for path in sorted(glob.glob(os.path.join(data_dir, "*.csv"))):
+        try:
+            df = pd.read_csv(path)
+        except Exception:
+            continue
+        text_col = next((c for c in TEXT_COLUMNS if c in df.columns), None)
+        label_col = next((c for c in LABEL_COLUMNS if c in df.columns), None)
+        if text_col is None or label_col is None:
+            continue
+        df = df[[text_col, label_col]].rename(columns={text_col: "text", label_col: "label"})
+        df = df.dropna()
+        df["label"] = df["label"].map(LABEL_MAP)
+        df = df.dropna(subset=["label"])
+        df["label"] = df["label"].astype(int)
+        df["text"] = df["text"].astype(str).str.strip()
+        df = df[df["text"] != ""]
+        df["source"] = os.path.splitext(os.path.basename(path))[0]
+        frames.append(df)
+
+    if not frames:
+        raise FileNotFoundError(f"هیچ دیتاست معتبری در {data_dir} پیدا نشد")
+
+    out = pd.concat(frames, ignore_index=True)
+    # حذف تکراری‌ها بین همه منابع (با متن نرمال‌شده)
+    out["_norm"] = out["text"].map(normalize_persian)
+    out = out.drop_duplicates(subset=["_norm"]).drop(columns=["_norm"])
+    return out.reset_index(drop=True)
+
+
+# ----------------------------------------------------------------
 # مدل‌ها
 # ----------------------------------------------------------------
-MODEL_NAME = "Ensemble v2 (LR + SVM + NB)"
+MODEL_NAME = "Calibrated LinearSVC (v3)"
 MODEL_FILENAME = "ensemble_model.joblib"
 
 
@@ -280,7 +329,7 @@ def get_lr():
 
 def get_svm():
     base = LinearSVC(
-        max_iter=3000, C=0.5, class_weight='balanced', random_state=RANDOM_STATE,
+        max_iter=3000, C=1.0, class_weight='balanced', random_state=RANDOM_STATE,
     )
     return CalibratedClassifierCV(base, cv=3)
 
@@ -300,18 +349,11 @@ def get_rf():
 
 def get_classifier():
     """
-    آنسامبل نسخه ۲: سه مدل متنوع با وزن مساوی.
-    انتخاب‌شده با 5-fold CV روی داده آموزش.
+    مدل نسخه ۳: لینیر‌اس‌وی‌سی کالیبره (C=1.0).
+    روی داده ترکیبی (ایمیل + پیامک فارسی) از بین چندین پیکربندی
+    با 5-fold CV بهترین نتیجه را داد.
     """
-    return VotingClassifier(
-        estimators=[
-            ('lr', get_lr()),
-            ('svm', get_svm()),
-            ('nb', get_nb()),
-        ],
-        voting='soft',
-        weights=[1, 1, 1],
-    )
+    return get_svm()
 
 
 def get_single_classifier():

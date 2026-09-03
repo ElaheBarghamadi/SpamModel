@@ -33,7 +33,7 @@ except ImportError:
 
 def main():
     parser = argparse.ArgumentParser(description="آموزش مدل Ensemble")
-    parser.add_argument("--data", "-d", default="data/emails.csv")
+    parser.add_argument("--data", "-d", default="data")
     parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--cv", type=int, default=5)
     parser.add_argument("--random-state", type=int, default=42)
@@ -53,16 +53,20 @@ def main():
     print("۱) بارگذاری داده")
     print("=" * 60)
 
-    df = pd.read_csv(args.data)
-    df = df.dropna(subset=["text", "label"]).reset_index(drop=True)
-
-    label_map = {"ham": 0, "spam": 1, "0": 0, "1": 1, 0: 0, 1: 1}
-    df["label"] = df["label"].map(label_map)
-    df = df.dropna(subset=["label"]).reset_index(drop=True)
-    df["label"] = df["label"].astype(int)
+    if os.path.isdir(args.data):
+        df = core.load_datasets(args.data)          # ادغام همه دیتاست‌های پوشه
+    else:
+        df = pd.read_csv(args.data)
+        df = df.dropna(subset=["text", "label"]).reset_index(drop=True)
+        label_map = {"ham": 0, "spam": 1, "0": 0, "1": 1, 0: 0, 1: 1}
+        df["label"] = df["label"].map(label_map)
+        df = df.dropna(subset=["label"]).reset_index(drop=True)
+        df["label"] = df["label"].astype(int)
 
     print(f"تعداد کل: {len(df)}")
     print(f"عادی: {int((df['label']==0).sum())}, اسپم: {int((df['label']==1).sum())}")
+    if "source" in df.columns:
+        print("منابع:", df.groupby("source").size().to_dict())
 
     # ----------------------------------------------------------------
     # 2) تقسیم داده
