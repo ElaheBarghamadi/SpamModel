@@ -271,8 +271,9 @@ MODEL_FILENAME = "ensemble_model.joblib"
 
 
 def get_lr():
+    # penalty حذف شده: در نسخه‌های جدید اسکیت‌لرن منسوخ است و پیش‌فرض همان l2 است
     return LogisticRegression(
-        max_iter=3000, C=1.0, penalty="l2", solver="liblinear",
+        max_iter=3000, C=1.0, solver="liblinear",
         class_weight='balanced', random_state=RANDOM_STATE,
     )
 
