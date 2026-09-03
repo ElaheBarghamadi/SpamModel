@@ -282,12 +282,47 @@ def as_model_input(messages):
 # ----------------------------------------------------------------
 # بارگذاری یکپارچه همه دیتاست‌ها
 # ----------------------------------------------------------------
-LABEL_MAP = {
-    "ham": 0, "normal": 0, "not spam": 0, "0": 0, 0: 0, "عادی": 0,
-    "spam": 1, "1": 1, 1: 1, "اسپم": 1,
-}
 TEXT_COLUMNS = ["text", "message", "content", "comment", "متن", "پیام"]
-LABEL_COLUMNS = ["label", "labels", "class", "target", "برچسب", "دسته"]
+LABEL_COLUMNS = ["label", "labels", "class", "target", "برچسب", "دسته", "category", "وضعیت"]
+
+_HAM_LABELS = {
+    'ham', 'normal', 'not spam', 'notspam', 'non-spam', 'nonspam', 'no spam',
+    'legit', 'legitimate', 'safe', 'clean', 'ok', 'good', 'benign',
+    'عادی', 'نرمال', 'سالم', 'غیر اسپم', 'هرزنامه نیست',
+}
+_SPAM_LABELS = {
+    'spam', 'junk', 'scam', 'phishing', 'phish', 'bad', 'ads', 'ad',
+    'اسپم', 'هرزنامه', 'هرزپیام', 'تبلیغ', 'تبلیغات', 'مزاحم', 'فیشینگ', 'کلاهبرداری',
+}
+
+
+def normalize_label(value):
+    """
+    تبدیل انواع مختلف برچسب به ۰ (عادی) یا ۱ (اسپم).
+    اگر برچسب ناشناخته باشد مقدار None برمی‌گرداند (سطر حذف می‌شود).
+    نمونه‌های پشتیبانی‌شده:
+      عادی: ham, Ham, HAM, normal, نرمال, عادی, سالم, not spam, 0, false, no
+      اسپم: spam, Spam, SPAM, junk, phishing, اسپم, هرزنامه, تبلیغات, فیشینگ, 1, true, yes
+    """
+    if isinstance(value, (bool, np.bool_)):
+        return 1 if value else 0
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        try:
+            v = int(value)
+        except (ValueError, OverflowError):
+            return None
+        return v if v in (0, 1) else None
+    s = str(value).strip().lower().replace('\u200c', ' ')
+    s = re.sub(r'\s+', ' ', s)
+    if s in ('0', 'false', 'no', 'نه', 'خیر', 'منفی'):
+        return 0
+    if s in ('1', 'true', 'yes', 'بله', 'آره', 'مثبت'):
+        return 1
+    if s in _HAM_LABELS:
+        return 0
+    if s in _SPAM_LABELS:
+        return 1
+    return None
 
 
 def load_datasets(data_dir="data"):
@@ -309,7 +344,7 @@ def load_datasets(data_dir="data"):
             continue
         df = df[[text_col, label_col]].rename(columns={text_col: "text", label_col: "label"})
         df = df.dropna()
-        df["label"] = df["label"].map(LABEL_MAP)
+        df["label"] = df["label"].map(normalize_label)
         df = df.dropna(subset=["label"])
         df["label"] = df["label"].astype(int)
         df["text"] = df["text"].astype(str).str.strip()

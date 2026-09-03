@@ -14,7 +14,9 @@
     <div class="card-body">
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
-            <label for="file">فایل CSV / Excel / TXT — ستون متن با نام <code>text</code> و ستون برچسب اختیاری <code>label</code> (spam/ham)</label>
+            <label for="file">فایل CSV / Excel / TXT — ستون متن: <code>text</code> | ستون برچسب اختیاری: <code>label</code> با هرکدام از این مقادیر:
+                <code>spam</code>/<code>ham</code>/<code>Spam</code>/<code>عادی</code>/<code>اسپم</code>/<code>نرمال</code>/<code>هرزنامه</code>/<code>فیشینگ</code>/<code>not spam</code>/<code>0</code>/<code>1</code>/<code>true</code>/<code>false</code>
+            </label>
             <input type="file" name="file" id="file" accept=".csv,.txt,.xlsx,.xls" required>
             <div style="margin-top:14px">
                 <button type="submit" class="btn btn-primary"><svg><use href="#i-spark"/></svg>پردازش فایل</button>

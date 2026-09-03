@@ -336,12 +336,6 @@ def test_text(request):
 # ----------------------------------------------------------------
 # تست فایل
 # ----------------------------------------------------------------
-LABEL_MAP = {
-    'ham': 0, 'normal': 0, 'not spam': 0, '0': 0, 0: 0, 'عادی': 0,
-    'spam': 1, '1': 1, 1: 1, 'اسپم': 1,
-}
-
-
 def test_file(request):
     results = summary = metrics = None
     has_labels = False
@@ -364,7 +358,7 @@ def test_file(request):
 
             if label_col:
                 has_labels = True
-                df['true_label'] = df[label_col].map(LABEL_MAP)
+                df['true_label'] = df[label_col].map(core.normalize_label)
                 df = df.dropna(subset=[text_col, 'true_label'])
                 df['true_label'] = df['true_label'].astype(int)
             else:
