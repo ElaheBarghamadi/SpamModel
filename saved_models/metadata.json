@@ -1,25 +1,25 @@
 {
   "display_name": "Calibrated LinearSVC (v3)",
-  "n_samples_total": 8469,
-  "n_train": 6775,
-  "n_test": 1694,
-  "test_accuracy": 0.9445,
-  "test_precision": 0.9899,
-  "test_recall": 0.9124,
-  "test_f1": 0.9496,
-  "test_roc_auc": 0.9906,
-  "train_accuracy": 0.983,
-  "overfit_gap": 0.0385,
-  "optimal_threshold": 0.76,
+  "n_samples_total": 10151,
+  "n_train": 8120,
+  "n_test": 2031,
+  "test_accuracy": 0.9404,
+  "test_precision": 0.9874,
+  "test_recall": 0.9174,
+  "test_f1": 0.9511,
+  "test_roc_auc": 0.9911,
+  "train_accuracy": 0.9833,
+  "overfit_gap": 0.0428,
+  "optimal_threshold": 0.79,
   "confusion_matrix": [
     [
-      715,
-      9
+      733,
+      15
     ],
     [
-      85,
-      885
+      106,
+      1177
     ]
   ],
-  "train_time_seconds": 8.0
+  "train_time_seconds": 8.6
 }
