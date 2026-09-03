@@ -1,7 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 Core ML code for Persian Spam Detection
-نسخه فوق حرفه‌ای - دقت بالا + ضد اورفیت
+نسخه ۲ (بهبودیافته) — دقت بالاتر، بدون نشت آستانه به داده تست
+
+تغییرات نسبت به نسخه قبل:
+  1. کلمات انگلیسی به‌جای حذف شدن، با حروف کوچک نگه داشته می‌شوند
+  2. ویژگی‌های ساختاری جدید (تعداد خطوط، هدر فوروارد، لگاریتم طول و...)
+  3. بردار واژگان بزرگ‌تر: کلمه (1,3) تا 15000 + کاراکتر (3,6) تا 15000
+  4. آنسامبل جدید: LR + LinearSVC کالیبره + ComplementNB با وزن مساوی
+  5. آستانه بر اساس بیشینه‌سازی F1 روی داده آموزش (نه تست)
 """
 
 import re
@@ -14,19 +21,22 @@ from sklearn.preprocessing import MaxAbsScaler
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import VotingClassifier, RandomForestClassifier, GradientBoostingClassifier
+from sklearn.ensemble import VotingClassifier
 from sklearn.svm import LinearSVC
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.naive_bayes import ComplementNB
 from sklearn.model_selection import cross_val_predict, StratifiedKFold
+from sklearn.metrics import f1_score
 
 RANDOM_STATE = 42
 
 # ----------------------------------------------------------------
 # تنظیمات TF-IDF
 # ----------------------------------------------------------------
-MAX_TFIDF_FEATURES = 12000
+MAX_TFIDF_FEATURES = 15000
+MAX_CHAR_FEATURES = 15000
 MIN_DF = 2
-MAX_DF = 0.9
+MAX_DF = 0.95
 
 # ----------------------------------------------------------------
 # کلمات کلیدی اسپم فارسی
@@ -39,7 +49,7 @@ SPAM_KEYWORDS = [
     'درآمد', 'میلیونی', 'پولدار', 'سرمایه', 'سود', 'فروشگاه',
     'سفارش', 'ارسال', 'پست', 'تحویل', 'گارانتی', 'ضمانت',
     'محدود', 'فوری', 'آخرین', 'فرصت', 'تمام', 'شدنی',
-    'ثبت', 'نام', 'عضویت', 'کد', 'تخفیف', 'OFF', 'SALE',
+    'ثبت', 'نام', 'عضویت', 'کد', 'تخفیف', 'off', 'sale',
     'whatsapp', 'telegram', 'instagram', 'اینستاگرام', 'واتساپ',
     '091', '092', '093', '090', '099',
 ]
@@ -79,30 +89,30 @@ def clean_text(text, **kwargs):
     text = str(text)
     text = normalize_persian(text)
     text = desensor_text(text)
-    
+
     # جایگزینی entity‌ها
     text = re.sub(r"(https?://\S+|www\.\S+)", " URLTOKEN ", text)
     text = re.sub(r"[\w.\-]+@[\w\-]+\.[a-zA-Z]{2,}", " EMAILTOKEN ", text)
     text = re.sub(r"(?:\+?\d{1,3}[\s\-]?)?(?:09\d{9}|0\d{9,10})", " PHONETOKEN ", text)
     text = re.sub(r"@\w+", " MENTIONTOKEN ", text)
     text = re.sub(r"#(\w+)", r" HASHTAGTOKEN \1", text)
-    
-    # کلمات انگلیسی
-    text = re.sub(r"[A-Za-z]{2,}", " ENGWORDTOKEN ", text)
-    
+
+    # بهبود اصلی: کلمات انگلیسی حفظ می‌شوند (با حروف کوچک)
+    text = text.lower()
+
     # تکرار حروف
     had_repeat = bool(re.search(r"(.)\1{2,}", text))
     text = re.sub(r"(.)\1{2,}", r"\1\1", text)
     if had_repeat:
         text += " REPEATEDCHARTOKEN"
-    
+
     # حذف ایموجی
     text = re.sub(r"[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF]", " ", text)
-    
+
     # حذف نقطه‌گذاری
     text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
     text = re.sub(r"\s+", " ", text).strip()
-    
+
     return text
 
 
@@ -110,7 +120,7 @@ CLEAN_KWARGS = {}
 
 
 # ----------------------------------------------------------------
-# ویژگی‌های مهندسی‌شده پیشرفته
+# ویژگی‌های مهندسی‌شده (پایه + ساختاری جدید)
 # ----------------------------------------------------------------
 def extract_engineered_features(raw_text):
     text = str(raw_text)
@@ -151,6 +161,12 @@ def extract_engineered_features(raw_text):
     has_action = 1 if any(w in text_lower for w in ['کلیک', 'کنید', 'بزنید', 'برید', 'فالو', 'لایک']) else 0
     has_spam_kw = 1 if spam_kw_count >= 2 else 0
 
+    # ویژگی‌های ساختاری جدید (نسخه ۲)
+    n_lines = text.count("\n")
+    has_fwd_header = 1 if re.search(r"\bTo:|\bFrom:|\bSubject:", text) else 0
+    has_gmail_header = 1 if text.lstrip().startswith(("Gmail", "gmail")) else 0
+    log_len = np.log1p(len(text))
+
     return [
         len(text),
         n_words,
@@ -176,6 +192,10 @@ def extract_engineered_features(raw_text):
         has_money,
         has_action,
         has_spam_kw,
+        n_lines,
+        has_fwd_header,
+        has_gmail_header,
+        log_len,
     ]
 
 
@@ -185,7 +205,7 @@ class EngineeredFeatures(BaseEstimator, TransformerMixin):
 
     def transform(self, X):
         texts = X.tolist() if hasattr(X, "tolist") else list(X)
-        return np.array([extract_engineered_features(t) for t in texts])
+        return np.array([extract_engineered_features(t) for t in texts], dtype=float)
 
 
 class CleanTextTransformer(BaseEstimator, TransformerMixin):
@@ -201,12 +221,12 @@ class CleanTextTransformer(BaseEstimator, TransformerMixin):
 
 
 # ----------------------------------------------------------------
-# Vectorizer قوی‌تر
+# Vectorizer
 # ----------------------------------------------------------------
 def build_vectorizer():
     return FeatureUnion([
         ("word", TfidfVectorizer(
-            ngram_range=(1, 3),      # تری‌گرام هم اضافه شد
+            ngram_range=(1, 3),
             min_df=MIN_DF,
             max_df=MAX_DF,
             sublinear_tf=True,
@@ -216,10 +236,10 @@ def build_vectorizer():
         )),
         ("char_wb", TfidfVectorizer(
             analyzer="char_wb",
-            ngram_range=(2, 5),      # بایگرام کاراکتری
+            ngram_range=(3, 6),
             min_df=MIN_DF,
             sublinear_tf=True,
-            max_features=8000,
+            max_features=MAX_CHAR_FEATURES,
         )),
     ])
 
@@ -244,27 +264,33 @@ def as_model_input(messages):
 
 
 # ----------------------------------------------------------------
-# مدل‌های بهینه
+# مدل‌ها
 # ----------------------------------------------------------------
-MODEL_NAME = "Ensemble (LR + SVM + RF)"
+MODEL_NAME = "Ensemble v2 (LR + SVM + NB)"
 MODEL_FILENAME = "ensemble_model.joblib"
 
 
 def get_lr():
     return LogisticRegression(
-        max_iter=2000, C=0.3, penalty="l2", solver="liblinear",
+        max_iter=3000, C=1.0, penalty="l2", solver="liblinear",
         class_weight='balanced', random_state=RANDOM_STATE,
     )
 
 
 def get_svm():
     base = LinearSVC(
-        max_iter=2000, C=0.5, class_weight='balanced', random_state=RANDOM_STATE,
+        max_iter=3000, C=0.5, class_weight='balanced', random_state=RANDOM_STATE,
     )
     return CalibratedClassifierCV(base, cv=3)
 
 
+def get_nb():
+    return ComplementNB(alpha=0.5)
+
+
 def get_rf():
+    # برای سازگاری با کدهای قدیمی نگه داشته شده؛ در آنسامبل جدید استفاده نمی‌شود
+    from sklearn.ensemble import RandomForestClassifier
     return RandomForestClassifier(
         n_estimators=200, max_depth=15, min_samples_leaf=2,
         class_weight='balanced', random_state=RANDOM_STATE, n_jobs=-1,
@@ -273,16 +299,17 @@ def get_rf():
 
 def get_classifier():
     """
-    Ensemble از 3 مدل مختلف برای دقت بالا
+    آنسامبل نسخه ۲: سه مدل متنوع با وزن مساوی.
+    انتخاب‌شده با 5-fold CV روی داده آموزش.
     """
     return VotingClassifier(
         estimators=[
             ('lr', get_lr()),
             ('svm', get_svm()),
-            ('rf', get_rf()),
+            ('nb', get_nb()),
         ],
-        voting='soft',  # استفاده از احتمالات
-        weights=[2, 2, 1],  # وزن بیشتر به LR و SVM
+        voting='soft',
+        weights=[1, 1, 1],
     )
 
 
@@ -292,10 +319,11 @@ def get_single_classifier():
 
 
 def evaluate_with_cv(X, y, cv=5):
+    from sklearn.model_selection import cross_val_score
     clf = get_single_classifier()
     pipe = build_pipeline(clf)
     skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=RANDOM_STATE)
-    
+
     scores = {
         'accuracy': cross_val_score(pipe, X, y, cv=skf, scoring='accuracy'),
         'precision': cross_val_score(pipe, X, y, cv=skf, scoring='precision'),
@@ -303,27 +331,30 @@ def evaluate_with_cv(X, y, cv=5):
         'f1': cross_val_score(pipe, X, y, cv=skf, scoring='f1'),
         'roc_auc': cross_val_score(pipe, X, y, cv=skf, scoring='roc_auc'),
     }
-    
+
     return {k: (v.mean(), v.std()) for k, v in scores.items()}
 
 
-def find_optimal_threshold(pipe, X_val, y_val):
+def find_optimal_threshold_from_proba(proba, y):
     """
-    پیدا کردن بهترین آستانه تصمیم‌گیری برای کمینه کردن خطاها
+    آستانه بهینه بر اساس بیشینه‌سازی F1.
+    باید روی احتمالات out-of-fold داده «آموزش» صدا زده شود تا نشتی به تست نباشد.
     """
-    proba = pipe.predict_proba(X_val)[:, 1]
-    
     best_threshold = 0.5
-    best_errors = float('inf')
-    
-    for threshold in np.arange(0.3, 0.7, 0.01):
+    best_f1 = -1.0
+
+    for threshold in np.arange(0.25, 0.75, 0.01):
         pred = (proba >= threshold).astype(int)
-        fp = ((pred == 1) & (y_val == 0)).sum()
-        fn = ((pred == 0) & (y_val == 1)).sum()
-        total_errors = fp + fn
-        
-        if total_errors < best_errors:
-            best_errors = total_errors
+        f1 = f1_score(y, pred, zero_division=0)
+        if f1 > best_f1:
+            best_f1 = f1
             best_threshold = threshold
-    
-    return best_threshold
+
+    return float(best_threshold)
+
+
+def find_optimal_threshold(pipe, X_val, y_val):
+    """سازگار با امضای قدیمی؛ برای استفاده صحیح ترجیحاً از
+    find_optimal_threshold_from_proba با احتمالات OOF استفاده کنید."""
+    proba = pipe.predict_proba(X_val)[:, 1]
+    return find_optimal_threshold_from_proba(proba, y_val)

@@ -1,97 +1,44 @@
 {% extends 'base.html' %}
 
-{% block title %}تست متن{% endblock %}
+{% block title %}تست متن — تشخیص اسپم{% endblock %}
 
 {% block content %}
-<h1 style="font-size: 1.8rem; margin-bottom: 24px;">📝 تست با متن</h1>
+<h1 class="page-title"><svg><use href="#i-pen"/></svg> تست متن</h1>
 
 <div class="card">
-    <div class="card-header">✍️ متن خود را وارد کنید</div>
+    <div class="card-header"><svg><use href="#i-pen"/></svg> متن پیام را وارد کنید</div>
     <div class="card-body">
         <form method="post">
             {% csrf_token %}
-            
-            <div class="form-group">
-                <textarea 
-                    name="text" 
-                    class="form-textarea" 
-                    placeholder="متن فارسی خود را اینجا بنویسید..."
-                    rows="5"
-                >{% if result %}{{ result.input_text }}{% endif %}</textarea>
+            <label for="text">متن پیام</label>
+            <textarea name="text" id="text" placeholder="مثال: 🎉 تبریک! شما برنده جایزه ۱۰ میلیون تومانی شدید. برای دریافت کلیک کنید...">{{ result.input_text|default:"" }}</textarea>
+            <div style="margin-top:14px; display:flex; gap:12px; flex-wrap:wrap">
+                <button type="submit" class="btn btn-primary"><svg><use href="#i-spark"/></svg>بررسی اسپم</button>
+                {% if result %}<a href="{% url 'test_text' %}" class="btn btn-ghost"><svg><use href="#i-x"/></svg>پاک کردن</a>{% endif %}
             </div>
-
-            <button type="submit" class="btn btn-primary btn-block">
-                🔍 بررسی کن
-            </button>
         </form>
     </div>
 </div>
 
 {% if result %}
-{% if result.error %}
-<div class="card" style="border-color: var(--danger);">
-    <div class="card-body" style="color: var(--danger);">
-        ❌ {{ result.error }}
-    </div>
-</div>
-{% else %}
-<div class="result-box {% if result.label == 'spam' %}result-spam{% else %}result-ham{% endif %}">
-    <div class="result-header">
-        <div class="result-icon">
-            {% if result.label == 'spam' %}🚫{% else %}✅{% endif %}
-        </div>
-        <div>
-            <div class="result-title">
-                {% if result.label == 'spam' %}اسپم شناسایی شد!{% else %}پیام عادی{% endif %}
+    {% if result.error %}
+    <div class="alert alert-error"><svg><use href="#i-alert"/></svg>{{ result.error }}</div>
+    {% else %}
+    <div class="card">
+        <div class="card-header"><svg><use href="#i-gauge"/></svg> نتیجه بررسی</div>
+        <div class="card-body">
+            <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:20px">
+                <span class="badge {% if result.label == 'spam' %}badge-spam{% else %}badge-ham{% endif %}" style="font-size:1.05rem; padding:8px 20px">
+                    {% if result.label == 'spam' %}<svg><use href="#i-x"/></svg>اسپم{% else %}<svg><use href="#i-check"/></svg>عادی{% endif %}
+                </span>
+                <span class="muted">اطمینان: <b>{{ result.confidence }}%</b></span>
             </div>
-            <span class="result-confidence">
-                احتمال: {{ result.confidence }}%
-            </span>
-        </div>
-    </div>
-    
-    <div style="margin-top: 12px; padding: 12px; background: rgba(0,0,0,0.05); border-radius: 8px;">
-        <strong>متن پاکسازی شده:</strong>
-        <div style="margin-top: 4px; color: var(--text-secondary);">{{ result.cleaned_text }}...</div>
-    </div>
-</div>
-{% endif %}
-{% endif %}
 
-<!-- نمونه‌های تست -->
-<div class="card" style="margin-top: 24px;">
-    <div class="card-header">🧪 نمونه‌های تست</div>
-    <div class="card-body">
-        <p style="color: var(--text-secondary); margin-bottom: 16px;">روی هر نمونه کلیک کنید:</p>
-        
-        <div style="display: grid; gap: 8px;">
-            <div class="sample-item" onclick="setSample(this)" data-text="سلام دوستان، حالتون چطوره؟" style="padding: 12px; background: var(--bg); border-radius: 8px; cursor: pointer; border-right: 3px solid var(--success);">
-                <span class="badge badge-ham">عادی</span>
-                سلام دوستان، حالتون چطوره؟
-            </div>
-            <div class="sample-item" onclick="setSample(this)" data-text="کانال تلگرام لینک بیو فالو کنید" style="padding: 12px; background: var(--bg); border-radius: 8px; cursor: pointer; border-right: 3px solid var(--danger);">
-                <span class="badge badge-spam">اسپم</span>
-                کانال تلگرام لینک بیو فالو کنید
-            </div>
-            <div class="sample-item" onclick="setSample(this)" data-text="درآمد میلیونی بدون سرمایه! کلیک کنید" style="padding: 12px; background: var(--bg); border-radius: 8px; cursor: pointer; border-right: 3px solid var(--danger);">
-                <span class="badge badge-spam">اسپم</span>
-                درآمد میلیونی بدون سرمایه! کلیک کنید
-            </div>
-            <div class="sample-item" onclick="setSample(this)" data-text="ممنون از راهنماییتون" style="padding: 12px; background: var(--bg); border-radius: 8px; cursor: pointer; border-right: 3px solid var(--success);">
-                <span class="badge badge-ham">عادی</span>
-                ممنون از راهنماییتون
-            </div>
-            <div class="sample-item" onclick="setSample(this)" data-text="کد تخفیف ویژه 50 درصد فقط امروز!" style="padding: 12px; background: var(--bg); border-radius: 8px; cursor: pointer; border-right: 3px solid var(--danger);">
-                <span class="badge badge-spam">اسپم</span>
-                کد تخفیف ویژه 50 درصد فقط امروز!
-            </div>
+            <label>احتمال اسپم بودن: <b>{{ result.probability }}%</b></label>
+            <div class="prob-bar"><div style="width:{{ result.probability }}%"></div></div>
+            <p class="muted" style="margin-top:10px">اگر احتمال بالای ۵۰٪ باشد پیام اسپم تشخیص داده می‌شود.</p>
         </div>
     </div>
-</div>
-
-<script>
-function setSample(el) {
-    document.querySelector('textarea[name="text"]').value = el.dataset.text;
-}
-</script>
+    {% endif %}
+{% endif %}
 {% endblock %}

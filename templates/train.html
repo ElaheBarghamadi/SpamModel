@@ -1,148 +1,94 @@
 {% extends 'base.html' %}
 
-{% block title %}آموزش مدل{% endblock %}
+{% block title %}آموزش مدل — تشخیص اسپم{% endblock %}
 
 {% block content %}
-<h1 style="font-size: 1.8rem; margin-bottom: 24px;">🤖 آموزش مدل</h1>
+<h1 class="page-title"><svg><use href="#i-bot"/></svg> آموزش مدل</h1>
 
 {% if error %}
-<div class="card" style="border-color: var(--danger);">
-    <div class="card-body" style="color: var(--danger);">❌ {{ error }}</div>
-</div>
+<div class="alert alert-error"><svg><use href="#i-alert"/></svg>{{ error }}</div>
 {% endif %}
 
 {% if success %}
-<!-- نمرات اصلی -->
+<div class="alert alert-success"><svg><use href="#i-check"/></svg>آموزش با موفقیت انجام شد و مدل ذخیره شد.</div>
+
 <div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-value">{{ model_info.test_accuracy }}%</div>
-        <div class="stat-label">Accuracy (تست)</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-value">{{ model_info.test_precision }}%</div>
-        <div class="stat-label">Precision</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-value">{{ model_info.test_recall }}%</div>
-        <div class="stat-label">Recall</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-value">{{ model_info.test_f1 }}%</div>
-        <div class="stat-label">F1-Score</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-value">{{ model_info.test_roc_auc }}%</div>
-        <div class="stat-label">ROC-AUC</div>
-    </div>
+    <div class="stat-card"><div class="stat-value">{{ metrics.accuracy }}%</div><div class="stat-label">Accuracy</div></div>
+    <div class="stat-card green"><div class="stat-value">{{ metrics.f1 }}%</div><div class="stat-label">F1-Score</div></div>
+    <div class="stat-card pink"><div class="stat-value">{{ metrics.roc_auc }}%</div><div class="stat-label">ROC-AUC</div></div>
+    <div class="stat-card amber"><div class="stat-value">{{ metrics.precision }}%</div><div class="stat-label">Precision</div></div>
+    <div class="stat-card"><div class="stat-value">{{ metrics.recall }}%</div><div class="stat-label">Recall</div></div>
 </div>
 
-<!-- تحلیل اورفیت -->
-<div class="card">
-    <div class="card-header">🔍 تحلیل اورفیت</div>
-    <div class="card-body">
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; text-align: center;">
-            <div style="padding: 16px; background: var(--bg); border-radius: 12px;">
-                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px;">دقت آموزش</div>
-                <div style="font-size: 1.5rem; font-weight: 700;">{{ model_info.train_accuracy }}</div>
-            </div>
-            <div style="padding: 16px; background: var(--bg); border-radius: 12px;">
-                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px;">دقت تست</div>
-                <div style="font-size: 1.5rem; font-weight: 700;">{{ model_info.test_accuracy }}</div>
-            </div>
-            <div style="padding: 16px; background: {% if model_info.overfit_gap < 0.02 %}rgba(16,185,129,0.1){% elif model_info.overfit_gap < 0.05 %}rgba(245,158,11,0.1){% else %}rgba(239,68,68,0.1){% endif %}; border-radius: 12px;">
-                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px;">اختلاف (Gap)</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: {% if model_info.overfit_gap < 0.02 %}var(--success){% elif model_info.overfit_gap < 0.05 %}var(--warning){% else %}var(--danger){% endif %};">
-                    {{ model_info.overfit_gap }}
-                </div>
-            </div>
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header"><svg><use href="#i-gauge"/></svg> جزئیات آموزش</div>
+        <div class="card-body">
+            <table class="tbl">
+                <tr><th>نمونه‌های آموزش</th><td>{{ raw.n_train }}</td></tr>
+                <tr><th>نمونه‌های تست</th><td>{{ raw.n_test }}</td></tr>
+                <tr><th>آستانه بهینه (از OOF آموزش)</th><td>{{ threshold }}</td></tr>
+                <tr><th>زمان آموزش</th><td>{{ train_time }} ثانیه</td></tr>
+                <tr><th>فاصله اورفیت (Train − Test)</th><td>{{ overfit_gap }}%</td></tr>
+                <tr><th>دقت روی آموزش</th><td>{{ raw.train_accuracy }}</td></tr>
+            </table>
         </div>
-        <div style="margin-top: 16px; padding: 12px; border-radius: 8px; background: {% if model_info.overfit_gap < 0.02 %}rgba(16,185,129,0.1){% elif model_info.overfit_gap < 0.05 %}rgba(245,158,11,0.1){% else %}rgba(239,68,68,0.1){% endif %};">
-            {% if model_info.overfit_gap < 0.02 %}
-                ✅ <strong>عالی!</strong> مدل اورفیت نشده (gap < 2%)
-            {% elif model_info.overfit_gap < 0.05 %}
-                ⚠️ <strong>قابل قبول</strong> (gap < 5%)
-            {% else %}
-                ❌ <strong>اورفیت!</strong> (gap > 5%) - نیاز به regularization بیشتر
-            {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-header"><svg><use href="#i-chart"/></svg> ماتریس اغتشاش</div>
+        <div class="card-body">
+            <table class="tbl" style="text-align:center">
+                <tr><th></th><th>پیش‌بینی: عادی</th><th>پیش‌بینی: اسپم</th></tr>
+                <tr>
+                    <th>واقعی: عادی</th>
+                    <td style="background:var(--success-bg);font-weight:800">{{ cm.0.0 }}</td>
+                    <td style="background:var(--danger-bg)">{{ cm.0.1 }}</td>
+                </tr>
+                <tr>
+                    <th>واقعی: اسپم</th>
+                    <td style="background:var(--danger-bg)">{{ cm.1.0 }}</td>
+                    <td style="background:var(--success-bg);font-weight:800">{{ cm.1.1 }}</td>
+                </tr>
+            </table>
         </div>
     </div>
 </div>
 
-<!-- ماتریس اغتشاش -->
 <div class="card">
-    <div class="card-header">📊 ماتریس اغتشاش</div>
-    <div class="card-body">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-width: 350px; margin: 0 auto;">
-            <div style="padding: 16px; background: rgba(16,185,129,0.15); border-radius: 8px; text-align: center;">
-                <div style="font-size: 0.7rem; color: var(--text-secondary);">واقعی: عادی ← پیش‌بینی: عادی</div>
-                <div style="font-size: 1.3rem; font-weight: 700; color: var(--success);">{{ model_info.confusion_matrix.0.0 }}</div>
-            </div>
-            <div style="padding: 16px; background: rgba(239,68,68,0.1); border-radius: 8px; text-align: center;">
-                <div style="font-size: 0.7rem; color: var(--text-secondary);">واقعی: عادی ← پیش‌بینی: اسپم</div>
-                <div style="font-size: 1.3rem; font-weight: 700; color: var(--danger);">{{ model_info.confusion_matrix.0.1 }}</div>
-            </div>
-            <div style="padding: 16px; background: rgba(239,68,68,0.1); border-radius: 8px; text-align: center;">
-                <div style="font-size: 0.7rem; color: var(--text-secondary);">واقعی: اسپم ← پیش‌بینی: عادی</div>
-                <div style="font-size: 1.3rem; font-weight: 700; color: var(--danger);">{{ model_info.confusion_matrix.1.0 }}</div>
-            </div>
-            <div style="padding: 16px; background: rgba(16,185,129,0.15); border-radius: 8px; text-align: center;">
-                <div style="font-size: 0.7rem; color: var(--text-secondary);">واقعی: اسپم ← پیش‌بینی: اسپم</div>
-                <div style="font-size: 1.3rem; font-weight: 700; color: var(--success);">{{ model_info.confusion_matrix.1.1 }}</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- گزارش طبقه‌بندی -->
-<div class="card">
-    <div class="card-header">📈 گزارش طبقه‌بندی</div>
-    <div class="card-body" style="overflow-x: auto;">
-        <table class="table">
+    <div class="card-header"><svg><use href="#i-spark"/></svg> گزارش طبقه‌بندی</div>
+    <div class="card-body" style="padding:0; overflow-x:auto">
+        <table class="tbl">
+            <tr><th>کلاس</th><th>Precision</th><th>Recall</th><th>F1</th><th>تعداد</th></tr>
+            {% for name, r in report.items %}
             <tr>
-                <th>کلاس</th>
-                <th>Precision</th>
-                <th>Recall</th>
-                <th>F1-Score</th>
-                <th>تعداد</th>
+                <td><b>{{ name }}</b></td>
+                <td>{{ r.precision }}%</td>
+                <td>{{ r.recall }}%</td>
+                <td>{{ r.f1 }}%</td>
+                <td>{{ r.support }}</td>
             </tr>
-            {% for class_name, metrics in report.items %}
-            {% if class_name != 'accuracy' and class_name != 'macro avg' and class_name != 'weighted avg' %}
-            <tr>
-                <td><span class="badge {% if class_name == 'spam' %}badge-spam{% else %}badge-ham{% endif %}">{{ class_name }}</span></td>
-                <td>{{ metrics.precision|floatformat:2 }}</td>
-                <td>{{ metrics.recall|floatformat:2 }}</td>
-                <td>{{ metrics.f1_score|floatformat:2 }}</td>
-                <td>{{ metrics.support }}</td>
-            </tr>
-            {% endif %}
             {% endfor %}
         </table>
     </div>
 </div>
+{% endif %}
 
-<div style="display: flex; gap: 12px;">
-    <a href="{% url 'test_text' %}" class="btn btn-primary">📝 تست متن</a>
-    <a href="{% url 'test_file' %}" class="btn btn-secondary">📁 تست فایل</a>
-</div>
-
-{% else %}
-<!-- فرم آموزش -->
 <div class="card">
-    <div class="card-header">⚙️ تنظیمات آموزش</div>
+    <div class="card-header"><svg><use href="#i-spark"/></svg> آموزش آنسامبل نسخه ۲ (LR + SVM + NB)</div>
     <div class="card-body">
-        <form method="post">
+        <p class="muted" style="margin-bottom:16px">
+            مدل روی دیتاست <code>data/emails.csv</code> آموزش می‌بیند. آستانه تصمیم به‌صورت خودکار و بدون نشت به داده تست
+            (با احتمالات out-of-fold روی داده آموزش) انتخاب می‌شود. این عملیات حدود ۳۰ تا ۶۰ ثانیه طول می‌کشد.
+        </p>
+        <form method="post" style="display:flex; gap:14px; align-items:end; flex-wrap:wrap">
             {% csrf_token %}
-            <div class="form-group">
-                <label class="form-label">نسبت تست (Test Size)</label>
-                <select name="test_size" class="form-select">
-                    <option value="0.1">10% تست / 90% آموزش</option>
-                    <option value="0.2" selected>20% تست / 80% آموزش</option>
-                    <option value="0.3">30% تست / 70% آموزش</option>
-                </select>
+            <div style="flex:1; min-width:200px">
+                <label for="test_size">سهم داده تست (۰.۱ تا ۰.۵)</label>
+                <input type="number" name="test_size" id="test_size" value="0.2" min="0.1" max="0.5" step="0.05">
             </div>
-            <button type="submit" class="btn btn-primary btn-block">🚀 شروع آموزش</button>
+            <button type="submit" class="btn btn-primary"><svg><use href="#i-bot"/></svg>شروع آموزش</button>
         </form>
     </div>
 </div>
-{% endif %}
 {% endblock %}

@@ -1,0 +1,25 @@
+{
+  "n_samples_total": 1000,
+  "n_train": 800,
+  "n_test": 200,
+  "test_accuracy": 0.985,
+  "test_precision": 0.9899,
+  "test_recall": 0.98,
+  "test_f1": 0.9849,
+  "test_roc_auc": 0.9992,
+  "train_accuracy": 0.9988,
+  "overfit_gap": 0.0138,
+  "optimal_threshold": 0.51,
+  "confusion_matrix": [
+    [
+      99,
+      1
+    ],
+    [
+      2,
+      98
+    ]
+  ],
+  "train_time_seconds": 5.4,
+  "display_name": "Ensemble v2 (LR + SVM + NB)"
+}

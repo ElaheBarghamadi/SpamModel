@@ -92,13 +92,15 @@ def main():
     print(f"زمان آموزش: {train_time:.1f} ثانیه")
 
     # ----------------------------------------------------------------
-    # 4) پیدا کردن threshold بهینه
+    # 4) پیدا کردن threshold بهینه (روی OOF داده آموزش — بدون نشت به تست)
     # ----------------------------------------------------------------
     print("\n" + "=" * 60)
-    print("۳) بهینه‌سازی Threshold")
+    print("۳) بهینه‌سازی Threshold (با OOF روی داده آموزش)")
     print("=" * 60)
 
-    optimal_threshold = core.find_optimal_threshold(pipe, X_test, y_test)
+    skf = StratifiedKFold(n_splits=args.cv, shuffle=True, random_state=args.random_state)
+    proba_oof = cross_val_predict(pipe, X_train, y_train, cv=skf, method="predict_proba")[:, 1]
+    optimal_threshold = core.find_optimal_threshold_from_proba(proba_oof, y_train)
     print(f"Threshold بهینه: {optimal_threshold:.2f}")
 
     # ----------------------------------------------------------------
