@@ -69,6 +69,61 @@ nav a:hover { background: var(--primary-light); color: var(--primary-dark); }
 nav a.active { background: var(--primary); color: #fff; box-shadow: 0 3px 10px rgba(99,102,241,.3); }
 nav svg { width: 16px; height: 16px; }
 
+/* ---------- دکمه همبرگر ---------- */
+.menu-btn {
+    display: none; align-items: center; justify-content: center;
+    width: 42px; height: 42px; border-radius: 11px; border: 1px solid var(--border);
+    background: #fff; color: var(--text); cursor: pointer; flex-shrink: 0;
+    transition: background .15s, border-color .15s;
+}
+.menu-btn:hover { background: var(--primary-light); border-color: var(--primary); color: var(--primary-dark); }
+
+/* ---------- سایدبار موبایل ---------- */
+.overlay {
+    position: fixed; inset: 0; background: rgba(15,23,42,.45);
+    opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 90;
+}
+.overlay.show { opacity: 1; pointer-events: auto; }
+
+.sidebar {
+    position: fixed; top: 0; bottom: 0; inset-inline-start: 0;
+    width: 280px; max-width: 85vw; background: #fff; z-index: 100;
+    transform: translateX(100%); transition: transform .28s cubic-bezier(.4,0,.2,1);
+    display: flex; flex-direction: column;
+    box-shadow: 8px 0 30px rgba(15,23,42,.15);
+}
+[dir="rtl"] .sidebar { transform: translateX(100%); }
+.sidebar.open { transform: translateX(0) !important; }
+
+.sidebar-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 16px 18px; border-bottom: 1px solid var(--border);
+}
+.sidebar-head .brand { font-size: .95rem; }
+.sidebar-head .brand small { display: none; }
+.close-btn {
+    width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border);
+    background: #fff; color: var(--text-2); cursor: pointer; display: grid; place-items: center;
+}
+.close-btn:hover { background: var(--danger-bg); color: var(--danger); border-color: #FECACA; }
+
+.sidebar-nav { display: flex; flex-direction: column; gap: 4px; padding: 14px; overflow-y: auto; }
+.sidebar-nav a {
+    color: var(--text); text-decoration: none; font-size: .95rem; font-weight: 600;
+    padding: 12px 15px; border-radius: 12px; display: flex; align-items: center; gap: 11px;
+    transition: background .15s;
+}
+.sidebar-nav a:hover { background: var(--primary-light); color: var(--primary-dark); }
+.sidebar-nav a.active { background: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(99,102,241,.35); }
+.sidebar-nav svg { width: 19px; height: 19px; }
+
+.sidebar-foot {
+    margin-top: auto; padding: 16px 20px; border-top: 1px solid var(--border);
+    color: var(--text-2); font-size: .75rem; text-align: center;
+}
+
+body.no-scroll { overflow: hidden; }
+
 /* ---------- چیدمان ---------- */
 main { max-width: 1060px; width: 100%; margin: 0 auto; padding: 34px 20px 56px; flex: 1; }
 
@@ -248,9 +303,9 @@ footer.site-footer {
 
 @media (max-width: 760px) {
     .grid-2 { grid-template-columns: 1fr; }
-    .topbar-inner { height: auto; padding: 10px 14px; flex-wrap: wrap; row-gap: 8px; }
-    nav { width: 100%; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
-    nav a { flex-shrink: 0; padding: 7px 12px; font-size: .83rem; }
+    .topbar-inner { height: 60px; padding: 0 14px; flex-wrap: nowrap; }
+    .desktop-nav { display: none; }
+    .menu-btn { display: flex; }
     .card-body { padding: 18px 16px; }
     .card-header { padding: 13px 16px; }
     table.tbl th, table.tbl td { padding: 9px 10px; font-size: .85rem; }

@@ -39,7 +39,7 @@
                     <small>پیامک و ایمیل — نسخه ۳</small>
                 </span>
             </a>
-            <nav>
+            <nav class="desktop-nav">
                 <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}"><svg><use href="#i-home"/></svg>خانه</a>
                 <a href="{% url 'train' %}" class="{% if request.resolver_match.url_name == 'train' %}active{% endif %}"><svg><use href="#i-bot"/></svg>آموزش مدل</a>
                 <a href="{% url 'test_text' %}" class="{% if request.resolver_match.url_name == 'test_text' %}active{% endif %}"><svg><use href="#i-pen"/></svg>تست متن</a>
@@ -47,8 +47,61 @@
                 <a href="{% url 'about' %}" class="{% if request.resolver_match.url_name == 'about' %}active{% endif %}"><svg><use href="#i-info"/></svg>توضیحات</a>
                 <a href="{% url 'report' %}" class="{% if request.resolver_match.url_name == 'report' %}active{% endif %}"><svg><use href="#i-report"/></svg>ریپورت مدل</a>
             </nav>
+            <button class="menu-btn" id="menuBtn" aria-label="باز کردن منو" aria-expanded="false">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+            </button>
         </div>
     </header>
+
+    <!-- سایدبار موبایل -->
+    <div class="overlay" id="overlay"></div>
+    <aside class="sidebar" id="sidebar" aria-label="منوی اصلی">
+        <div class="sidebar-head">
+            <a class="brand" href="{% url 'home' %}">
+                <span class="logo"><svg><use href="#i-shield"/></svg></span>
+                <span>تشخیص اسپم فارسی</span>
+            </a>
+            <button class="close-btn" id="closeBtn" aria-label="بستن منو">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}"><svg><use href="#i-home"/></svg>خانه</a>
+            <a href="{% url 'train' %}" class="{% if request.resolver_match.url_name == 'train' %}active{% endif %}"><svg><use href="#i-bot"/></svg>آموزش مدل</a>
+            <a href="{% url 'test_text' %}" class="{% if request.resolver_match.url_name == 'test_text' %}active{% endif %}"><svg><use href="#i-pen"/></svg>تست متن</a>
+            <a href="{% url 'test_file' %}" class="{% if request.resolver_match.url_name == 'test_file' %}active{% endif %}"><svg><use href="#i-folder"/></svg>تست فایل</a>
+            <a href="{% url 'about' %}" class="{% if request.resolver_match.url_name == 'about' %}active{% endif %}"><svg><use href="#i-info"/></svg>توضیحات</a>
+            <a href="{% url 'report' %}" class="{% if request.resolver_match.url_name == 'report' %}active{% endif %}"><svg><use href="#i-report"/></svg>ریپورت مدل</a>
+        </nav>
+        <div class="sidebar-foot">مدل Calibrated LinearSVC — نسخه ۳</div>
+    </aside>
+
+    <script>
+        (function () {
+            var sidebar = document.getElementById('sidebar'),
+                overlay = document.getElementById('overlay'),
+                menuBtn = document.getElementById('menuBtn'),
+                closeBtn = document.getElementById('closeBtn');
+            function open() {
+                sidebar.classList.add('open');
+                overlay.classList.add('show');
+                document.body.classList.add('no-scroll');
+                menuBtn.setAttribute('aria-expanded', 'true');
+            }
+            function close() {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('show');
+                document.body.classList.remove('no-scroll');
+                menuBtn.setAttribute('aria-expanded', 'false');
+            }
+            menuBtn.addEventListener('click', open);
+            closeBtn.addEventListener('click', close);
+            overlay.addEventListener('click', close);
+            sidebar.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', close); });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+            window.addEventListener('resize', function () { if (window.innerWidth > 760) close(); });
+        })();
+    </script>
 
     <main>
         {% block content %}{% endblock %}
