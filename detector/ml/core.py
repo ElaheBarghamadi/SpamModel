@@ -428,10 +428,10 @@ def evaluate_with_cv(X, y, cv=5):
     return {k: (v.mean(), v.std()) for k, v in scores.items()}
 
 
-def find_optimal_threshold_from_proba(proba, y, fp_cost=5.0, fn_cost=1.0):
+def find_optimal_threshold_from_proba(proba, y, fp_cost=2.0, fn_cost=1.0):
     """
-    آستانه بهینه با رویکرد محافظه‌کارانه:
-    اسپم‌کردنِ اشتباهی یک پیام عادی (FP) پنج برابر بدتر از رد شدن یک اسپم (FN) است.
+    آستانه بهینه با رویکرد هزینه‌محور متعادل:
+    اسپم‌کردنِ اشتباهی یک پیام عادی (FP) دو برابر بدتر از رد شدن یک اسپم (FN) است.
     باید روی احتمالات out-of-fold داده «آموزش» صدا زده شود تا نشتی به تست نباشد.
     بین آستانه‌های هم‌هزینه، آستانه بالاتر (امن‌تر) انتخاب می‌شود.
     """
