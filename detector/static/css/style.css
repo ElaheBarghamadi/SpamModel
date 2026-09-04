@@ -82,7 +82,7 @@ main { max-width: 1060px; width: 100%; margin: 0 auto; padding: 34px 20px 56px; 
     display: flex; align-items: center; gap: 9px;
 }
 .card-header svg { width: 19px; height: 19px; color: var(--primary); }
-.card-body { padding: 24px; }
+.card-body { padding: 24px; overflow-x: auto; }
 
 h1.page-title {
     font-size: 1.5rem; margin: 2px 0 6px; display: flex; align-items: center; gap: 12px; font-weight: 800;
@@ -238,11 +238,42 @@ footer.site-footer {
     text-align: center; color: var(--text-2); font-size: .8rem; padding: 20px; margin-top: auto;
 }
 
-/* ---------- متفرقه ---------- */
-.muted { color: var(--text-2); font-size: .85rem; }
+/* ---------- ریسپانسیو ---------- */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+
+@media (max-width: 900px) {
+    main { padding: 26px 16px 48px; }
+    .stats-grid { gap: 12px; }
+}
+
 @media (max-width: 760px) {
     .grid-2 { grid-template-columns: 1fr; }
-    .topbar-inner { height: auto; padding: 10px 14px; flex-wrap: wrap; }
-    nav { width: 100%; justify-content: center; }
+    .topbar-inner { height: auto; padding: 10px 14px; flex-wrap: wrap; row-gap: 8px; }
+    nav { width: 100%; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+    nav a { flex-shrink: 0; padding: 7px 12px; font-size: .83rem; }
+    .card-body { padding: 18px 16px; }
+    .card-header { padding: 13px 16px; }
+    table.tbl th, table.tbl td { padding: 9px 10px; font-size: .85rem; }
+    h1.page-title { font-size: 1.3rem; }
+    h1.page-title .icon-chip { width: 40px; height: 40px; }
+    .steps li { padding: 0 48px 20px 0; }
+    .md { font-size: .88rem; }
+    .md table th, .md table td { padding: 7px 10px; font-size: .82rem; }
+}
+
+@media (max-width: 480px) {
+    main { padding: 20px 12px 40px; }
+    .brand { font-size: .95rem; }
+    .brand small { display: none; }
+    .brand .logo { width: 34px; height: 34px; }
+    .stat-value { font-size: 1.35rem; }
+    .stat-label { font-size: .76rem; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .guide-grid { grid-template-columns: 1fr; }
+    h1.page-title { font-size: 1.18rem; gap: 9px; }
+    h2.section-title { font-size: 1rem; }
+    .btn { padding: 10px 18px; font-size: .9rem; flex: 1 1 auto; justify-content: center; }
+    textarea, input[type=number] { font-size: .9rem; }
+    .chip { font-size: .76rem; padding: 4px 10px; }
+    .log-line { font-size: .8rem; word-break: break-word; }
 }

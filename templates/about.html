@@ -1,53 +1,55 @@
 {% extends 'base.html' %}
 
-{% block title %}توضیحات — تشخیص اسپم فارسی{% endblock %}
+{% block title %}توضیحات مدل — تشخیص اسپم فارسی{% endblock %}
 
 {% block content %}
 <h1 class="page-title">
     <span class="icon-chip"><svg><use href="#i-info"/></svg></span>
-    توضیحات سیستم
+    توضیحات مدل
 </h1>
-<p class="page-subtitle">این مدل چطور کار می‌کند، روی چه داده‌ای آموزش دیده و سیاست تصمیم‌گیری آن چیست.</p>
+<p class="page-subtitle">معماری مدل، نحوه عملکرد، داده‌های آموزشی و سیاست تصمیم‌گیری.</p>
 
 <!-- چیست -->
 <div class="card">
-    <div class="card-header"><svg><use href="#i-shield"/></svg> این سیستم چیست؟</div>
+    <div class="card-header"><svg><use href="#i-shield"/></svg> این مدل چیست؟</div>
     <div class="card-body">
         <p>
-            یک <b>سیستم تشخیص اسپم برای پیام‌های فارسی</b> (پیامک و ایمیل) است. هر متنی که وارد شود،
-            مدل احتمال اسپم‌بودن آن را از ۰ تا ۱۰۰ درصد محاسبه می‌کند و بر اساس یک آستانه هزینه‌محور،
-            پیام را «اسپم» یا «عادی» طبقه‌بندی می‌کند.
+            یک مدل <b>دسته‌بندی متن برای تشخیص اسپم و فیشینگ در زبان فارسی</b> است. ورودی آن یک پیام
+            (پیامک یا ایمیل) است و خروجی آن <b>احتمال اسپم‌بودن</b> از ۰ تا ۱۰۰ درصد.
         </p>
         <p style="margin-top:10px">
-            مدل از نوع <b>Calibrated LinearSVC</b> است: یک دسته‌بند بردار پشتیبان خطی که خروجی آن
-            <b>کالیبره</b> شده؛ یعنی درصد اعلام‌شده واقعاً معنای احتمالی دارد (مثلاً ۹۵٪ یعنی واقعاً
-            ۹۵ پیام از هر ۱۰۰ پیام مشابه، اسپم هستند).
+            معماری مدل از نوع <b>Calibrated LinearSVC</b> است: یک دسته‌بند «ماشین بردار پشتیبان خطی» که خروجی آن
+            با اعتبارسنجی متقاطع <b>کالیبره</b> شده است؛ یعنی درصد اعلام‌شده واقعاً معنای احتمالی دارد
+            (مثلاً ۹۵٪ یعنی واقعاً حدود ۹۵ پیام از هر ۱۰۰ پیام مشابه، اسپم هستند).
         </p>
     </div>
 </div>
 
 <!-- چطور کار می‌کند -->
 <div class="card">
-    <div class="card-header"><svg><use href="#i-spark"/></svg> مراحل تشخیص</div>
+    <div class="card-header"><svg><use href="#i-spark"/></svg> مراحل تشخیص در مدل</div>
     <div class="card-body">
         <ol class="steps">
             <li>
                 <b>نرمال‌سازی متن فارسی</b>
-                <p>یکدست‌سازی نیم‌فاصله‌ها، اعراب، «ي/ی» و «ك/ک»، حذف نویز و تبدیل ارقام.</p>
+                <p>یکدست‌سازی نیم‌فاصله‌ها، اعراب، «ي/ی» و «ك/ک»، حذف نویز و تبدیل ارقام تا تفاوت‌های ظاهری
+                باعث خطای مدل نشوند.</p>
             </li>
             <li>
                 <b>استخراج ویژگی</b>
-                <p>۳۱ ویژگی مهندسی‌شده (لینک، فوریت، درخواست اطلاعات، ایموجی، حروف جداشده و…) به همراه دو مدل
-                بردار‌سازی متنی: کلمه‌ای (n-gram تا ۳) و نویسه‌ای (n-gram تا ۶).</p>
+                <p>۳۱ ویژگی مهندسی‌شده (وجود لینک، عبارات فوریت، درخواست اطلاعات، ایموجی، حروف جداشده و…)
+                به همراه دو بردار‌سازی متنی: کلمه‌ای (n-gram تا ۳) و نویسه‌ای (n-gram تا ۶) که مدل را
+                در برابر غلط املایی و شکستن کلمات مقاوم می‌کند.</p>
             </li>
             <li>
                 <b>طبقه‌بندی و کالیبراسیون</b>
-                <p>مدل خطی با وزن متعادل، کالیبره‌شده با اعتبارسنجی متقاطع برای تولید احتمال قابل‌اعتماد.</p>
+                <p>مدل خطی با وزن متعادل بین دو کلاس، کالیبره‌شده با اعتبارسنجی متقاطع ۳-لایه
+                برای تولید احتمال قابل‌اعتماد.</p>
             </li>
             <li>
                 <b>تصمیم نهایی با آستانه هزینه‌محور</b>
-                <p>اگر احتمال اسپم از آستانه ({{ threshold|default:"—" }}) بیشتر باشد، پیام اسپم اعلام می‌شود؛
-                در غیر این صورت عادی است تا پیام‌های سالم آسیب نبینند.</p>
+                <p>اگر احتمال اسپم از آستانه ({{ threshold|default:"—" }}) بیشتر باشد پیام اسپم اعلام می‌شود؛
+                این آستانه روی داده‌های بیرون از آموزش و با هزینه نامتقارن بهینه شده است.</p>
             </li>
         </ol>
     </div>
@@ -55,20 +57,21 @@
 
 <!-- سیاست تصمیم -->
 <div class="card">
-    <div class="card-header"><svg><use href="#i-sliders"/></svg> سیاست تصمیم‌گیری (حالت هزینه‌محور متعادل)</div>
+    <div class="card-header"><svg><use href="#i-sliders"/></svg> سیاست تصمیم‌گیری مدل</div>
     <div class="card-body">
         <p>
-            برای یک فیلتر اسپم، <b>اسپم‌کردنِ اشتباهی یک پیام عادی</b> خیلی بدتر از رد شدن یک اسپم است —
-            چون پیام مهم کاربر ممکن است دیده نشود. به همین دلیل آستانه تصمیم به‌جای ۵۰٪،
-            با <b>هزینه نامتقارن</b> انتخاب شده است:
+            در تشخیص اسپم، دو نوع خطا وجود دارد: پیام عادی اشتباهاً اسپم شود، یا اسپم اشتباهاً عادی شناخته شود.
+            خطای اول برای کاربر بدتر است چون ممکن است پیام مهم دیده نشود؛ بنابراین آستانه تصمیم با
+            <b>هزینه نامتقارن</b> انتخاب شده است:
         </p>
         <blockquote style="border-inline-start:4px solid var(--primary); background:var(--primary-light); padding:12px 18px; border-radius:0 12px 12px 0; margin:14px 0; color:#3730A3; font-weight:600;">
             هزینهٔ هر خطای «عادی → اسپم» دو برابر خطای «اسپم → عادی» است.
         </blockquote>
         <p>
-            نتیجه: وقتی سیستم پیامی را «اسپم» اعلام می‌کند، به احتمال قریب به یقین واقعاً اسپم است
-            {% if stats %}(دقت برچسب اسپم در تست: <b>{{ stats.precision }}%</b>){% endif %}
-            و نرخ اشتباه روی پیام‌های عادی بسیار پایین است.
+            نتیجه: وقتی مدل پیامی را «اسپم» اعلام می‌کند، به احتمال قریب به یقین واقعاً اسپم است
+            {% if stats %}(دقت برچسب اسپم در داده تست: <b>{{ stats.precision }}%</b>){% endif %}
+            و در همان حال بازیابی اسپم بالا باقی می‌ماند
+            {% if stats %}(<b>{{ stats.recall }}%</b>){% endif %}.
         </p>
     </div>
 </div>
@@ -76,10 +79,10 @@
 <!-- داده آموزشی -->
 {% if sources %}
 <div class="card">
-    <div class="card-header"><svg><use href="#i-db"/></svg> داده‌های آموزشی</div>
+    <div class="card-header"><svg><use href="#i-db"/></svg> داده‌های آموزشی مدل</div>
     <div class="card-body">
         <p style="margin-bottom:14px">
-            مدل روی <b>{{ total }}</b> نمونه آموزش دیده است:
+            مدل روی <b>{{ total }}</b> نمونه آموزش دیده است — تقریباً متوازن:
             <span class="badge badge-spam">{{ n_spam }} اسپم</span>
             <span class="badge badge-ham">{{ n_ham }} عادی</span>
         </p>
@@ -118,59 +121,16 @@
 </div>
 {% endif %}
 
-<!-- برچسب‌ها -->
-<div class="card">
-    <div class="card-header"><svg><use href="#i-pen"/></svg> برچسب‌های پشتیبانی‌شده در تست فایل</div>
-    <div class="card-body">
-        <p style="margin-bottom:12px">ستون <code>label</code> اختیاری است و هرکدام از این مقادیر را می‌پذیرد:</p>
-        <div class="chip-group" style="margin-bottom:14px">
-            <span class="chip">spam</span><span class="chip">Spam</span><span class="chip">اسپم</span>
-            <span class="chip">هرزنامه</span><span class="chip">فیشینگ</span><span class="chip">تبلیغات</span>
-            <span class="chip">1</span><span class="chip">true</span>
-        </div>
-        <div class="chip-group">
-            <span class="chip">ham</span><span class="chip">عادی</span><span class="chip">نرمال</span>
-            <span class="chip">not spam</span><span class="chip">سالم</span><span class="chip">0</span><span class="chip">false</span>
-        </div>
-        <p class="muted" style="margin-top:12px">مقادیر ناشناخته بدون خطا حذف می‌شوند و بقیه فایل پردازش می‌شود.</p>
-    </div>
-</div>
-
-<!-- راهنمای صفحات -->
-<h2 class="section-title"><svg><use href="#i-home"/></svg> بخش‌های سیستم</h2>
-<div class="guide-grid">
-    <a class="guide-card" href="{% url 'train' %}">
-        <span class="g-icon"><svg><use href="#i-bot"/></svg></span>
-        <h3>آموزش مدل</h3>
-        <p>بازآموزی کامل روی همه دیتاست‌ها با مشاهده لاگ زنده مراحل و نتایج نهایی.</p>
-    </a>
-    <a class="guide-card" href="{% url 'test_text' %}">
-        <span class="g-icon"><svg><use href="#i-pen"/></svg></span>
-        <h3>تست متن</h3>
-        <p>یک پیام را تایپ کنید و نتیجه را همراه درصد احتمال اسپم ببینید.</p>
-    </a>
-    <a class="guide-card" href="{% url 'test_file' %}">
-        <span class="g-icon"><svg><use href="#i-folder"/></svg></span>
-        <h3>تست فایل</h3>
-        <p>فایل CSV / Excel / TXT تا ۲۰۰۰ ردیف را آپلود کنید و ارزیابی کامل بگیرید.</p>
-    </a>
-    <a class="guide-card" href="{% url 'report' %}">
-        <span class="g-icon"><svg><use href="#i-report"/></svg></span>
-        <h3>ریپورت مدل</h3>
-        <p>گزارش جامع مدل: معماری، داده‌ها، نتایج اندازه‌گیری‌شده و تاریخچه نسخه‌ها.</p>
-    </a>
-</div>
-
-<!-- نکات -->
+<!-- نکات فنی -->
 {% if threshold %}
-<div class="alert alert-success" style="margin-top:22px">
+<div class="alert alert-success">
     <svg><use href="#i-check"/></svg>
-    مدل فعال است — آستانه تصمیم فعلی: {{ threshold }} | برای تغییر محافظه‌کاری، پارامتر <code>fp_cost</code> در <code>core.py</code> را تنظیم کنید.
+    <span>مدل فعال است — آستانه تصمیم فعلی: <b>{{ threshold }}</b>. برای محافظه‌کاری بیشتر یا کمتر، پارامتر <code>fp_cost</code> در <code>detector/ml/core.py</code> تغییر می‌کند.</span>
 </div>
 {% else %}
-<div class="alert alert-warn" style="margin-top:22px">
+<div class="alert alert-warn">
     <svg><use href="#i-alert"/></svg>
-    مدل هنوز آموزش داده نشده است. از بخش «آموزش مدل» شروع کنید.
+    مدل هنوز آموزش داده نشده است.
 </div>
 {% endif %}
 {% endblock %}
