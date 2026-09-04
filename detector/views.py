@@ -49,6 +49,91 @@ def load_dataset():
     return core.load_datasets(os.path.join(settings.BASE_DIR, 'data'))
 
 
+# ----------------------------------------------------------------
+# توضیحات
+# ----------------------------------------------------------------
+def about(request):
+    meta = load_metadata()
+
+    # آمار دیتاست‌ها به تفکیک منبع
+    sources = []
+    total = n_spam = 0
+    try:
+        df = load_dataset()
+        total = len(df)
+        n_spam = int((df['label'] == 1).sum())
+        for src, g in df.groupby('source'):
+            s = int((g['label'] == 1).sum())
+            sources.append({
+                'name': src,
+                'total': len(g),
+                'spam': s,
+                'ham': len(g) - s,
+            })
+        sources.sort(key=lambda x: -x['total'])
+    except Exception:
+        pass
+
+    # آستانه مدل فعلی
+    threshold = None
+    if os.path.exists(MODEL_PATH):
+        try:
+            threshold = round(float(joblib.load(MODEL_PATH).get('threshold', 0.5)), 2)
+        except Exception:
+            pass
+
+    context = {
+        'sources': sources,
+        'total': total,
+        'n_spam': n_spam,
+        'n_ham': total - n_spam,
+        'threshold': threshold,
+        'model_exists': os.path.exists(MODEL_PATH),
+    }
+    if meta:
+        context['meta'] = meta
+        context['stats'] = {
+            'accuracy': round(meta.get('test_accuracy', 0) * 100, 2),
+            'precision': round(meta.get('test_precision', 0) * 100, 2),
+            'recall': round(meta.get('test_recall', 0) * 100, 2),
+            'f1': round(meta.get('test_f1', 0) * 100, 2),
+            'roc_auc': round(meta.get('test_roc_auc', 0) * 100, 2),
+            'n_test': meta.get('n_test', 0),
+        }
+    return render(request, 'about.html', context)
+
+
+# ----------------------------------------------------------------
+# ریپورت مدل (رندر فایل REPORT.md)
+# ----------------------------------------------------------------
+def report(request):
+    report_path = os.path.join(settings.BASE_DIR, 'REPORT.md')
+    text = None
+    if os.path.exists(report_path):
+        try:
+            with open(report_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+        except Exception:
+            text = None
+
+    html = None
+    if text:
+        try:
+            import markdown
+            html = markdown.markdown(
+                text,
+                extensions=['tables', 'fenced_code', 'sane_lists'],
+            )
+        except Exception:
+            html = None  # نمایش به صورت متن ساده
+
+    return render(request, 'report.html', {
+        'html': html,
+        'raw': text if html is None else None,
+        'missing': text is None,
+    })
+
+
 def save_model(pipe, threshold, metrics):
     os.makedirs(SAVED_DIR, exist_ok=True)
     joblib.dump({'pipeline': pipe, 'threshold': float(threshold), 'version': 'v3'}, MODEL_PATH)

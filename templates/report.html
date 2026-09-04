@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block title %}ریپورت مدل — تشخیص اسپم فارسی{% endblock %}
+
+{% block content %}
+<h1 class="page-title">
+    <span class="icon-chip"><svg><use href="#i-report"/></svg></span>
+    ریپورت مدل
+</h1>
+<p class="page-subtitle">گزارش جامع مدل: معماری، داده‌های آموزشی، نتایج اندازه‌گیری‌شده، نقاط قوت و ضعف.</p>
+
+{% if missing %}
+<div class="alert alert-error">
+    <svg><use href="#i-alert"/></svg>
+    فایل گزارش (REPORT.md) در ریشه پروژه پیدا نشد.
+</div>
+{% elif html %}
+<div class="card">
+    <div class="card-body md">
+        {{ html|safe }}
+    </div>
+</div>
+{% else %}
+<div class="alert alert-warn">
+    <svg><use href="#i-alert"/></svg>
+    کتابخانهٔ <code>markdown</code> نصب نیست؛ گزارش به صورت متن ساده نمایش داده می‌شود. برای نمایش بهتر: <code>pip install markdown</code>
+</div>
+<div class="card">
+    <div class="card-body">
+        <pre style="white-space:pre-wrap; font-family:inherit; font-size:.9rem; line-height:1.9;">{{ raw }}</pre>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

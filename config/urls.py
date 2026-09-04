@@ -12,6 +12,8 @@ urlpatterns = [
     path('train/status/', views.train_status, name='train_status'),
     path('test/', views.test_text, name='test_text'),
     path('test-file/', views.test_file, name='test_file'),
+    path('about/', views.about, name='about'),
+    path('report/', views.report, name='report'),
     path('api/predict/', views.api_predict, name='api_predict'),
 ]
 

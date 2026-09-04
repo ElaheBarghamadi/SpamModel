@@ -3,3 +3,4 @@ scikit-learn>=1.2
 joblib>=1.2
 pandas>=1.5
 numpy>=1.23
+markdown>=3.5
