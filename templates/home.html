@@ -7,6 +7,23 @@
 </h1>
 <p class="page-subtitle">تشخیص هرزنامه و فیشینگ در پیامک و ایمیل فارسی با اولویت محافظت از پیام‌های عادی.</p>
 
+<!-- پنل ترمینال وضعیت مدل -->
+{% if meta %}
+<div class="card term">
+    <div class="term-head">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span class="ttl">model@spam-detector:~</span>
+    </div>
+    <div class="term-body">
+        <div class="cmd"><b>$</b> load_model --name calibrated-linearsvc --version v3</div>
+        <div class="ok">✓ pipeline loaded | threshold={{ meta.optimal_threshold }} | samples={{ dataset_stats.total }} (spam {{ dataset_stats.spam }} / ham {{ dataset_stats.ham }})</div>
+        <div class="cmd"><b>$</b> evaluate --set holdout --metrics acc,precision,recall,auc</div>
+        <div class="ok">✓ acc={{ stats.accuracy }}% | precision={{ stats.precision }}% | recall={{ stats.recall }}% | auc={{ stats.roc_auc }}% | train_time={{ meta.train_time_seconds }}s</div>
+        <div class="cmd cursor"><b>$</b> </div>
+    </div>
+</div>
+{% endif %}
+
 {% if not model_exists %}
 <div class="alert alert-warn">
     <svg><use href="#i-alert"/></svg>
