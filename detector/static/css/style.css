@@ -169,7 +169,7 @@ h2.section-title svg { width: 20px; height: 20px; color: var(--primary); }
 /* ---------- جدول ---------- */
 .table-wrap { overflow-x: auto; }
 table.tbl { width: 100%; border-collapse: collapse; font-size: .92rem; }
-table.tbl th, table.tbl td { padding: 11px 15px; text-align: right; border-bottom: 1px solid var(--border); }
+table.tbl th, table.tbl td { padding: 11px 15px; text-align: right; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; word-break: break-word; }
 table.tbl th { background: #F8FAFF; color: var(--text-2); font-size: .8rem; font-weight: 700; white-space: nowrap; }
 table.tbl tr:last-child td { border-bottom: none; }
 table.tbl tbody tr:hover td { background: #FAFBFF; }
@@ -286,6 +286,20 @@ label { display: block; font-weight: 700; font-size: .88rem; margin-bottom: 8px;
 .md table tr:nth-child(even) td { background: #FBFCFE; }
 .md hr { border: none; border-top: 1px dashed var(--border); margin: 26px 0; }
 .md strong { color: var(--primary-dark); }
+
+@media (max-width: 360px) {
+    .sidebar { width: 250px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; gap: 9px; }
+    .stat-card { padding: 13px 10px; }
+    h1.page-title { font-size: 1.08rem; }
+    h1.page-title .icon-chip { width: 36px; height: 36px; border-radius: 11px; }
+    h1.page-title .icon-chip svg { width: 19px; height: 19px; }
+    .steps li { padding: 0 44px 18px 0; }
+    .steps li::before { width: 32px; height: 32px; font-size: .85rem; }
+    table.tbl th, table.tbl td { padding: 8px 7px; font-size: .8rem; }
+    .guide-card { padding: 17px; }
+    .alert { font-size: .84rem; padding: 12px 14px; }
+}
 
 /* ---------- فوتر ---------- */
 footer.site-footer {
